@@ -1,21 +1,19 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-
 namespace DbAccess
 {
+    using System.Collections.Generic;
+
     public class IndexSchema
     {
-        public string IndexName;
+        public string IndexName { get; set; }
 
-        public bool IsUnique;
+        public bool IsUnique { get; set; }
 
-        public List<IndexColumn> Columns;
+        public List<IndexColumn> Columns { get; set; }
     }
 
     public class IndexColumn
     {
-        public string ColumnName;
-        public bool IsAscending;
+        public string ColumnName { get; set; }
+        public bool IsAscending { get; set; }
     }
 }

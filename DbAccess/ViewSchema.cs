@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-
 namespace DbAccess
 {
     /// <summary>
@@ -12,11 +8,11 @@ namespace DbAccess
         /// <summary>
         /// Contains the view name
         /// </summary>
-        public string ViewName;
+        public string ViewName { get; set; }
 
         /// <summary>
         /// Contains the view SQL statement
         /// </summary>
-        public string ViewSQL;
+        public string ViewSQL { get; set; }
     }
 }

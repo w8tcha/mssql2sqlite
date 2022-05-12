@@ -1,21 +1,17 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-
 namespace DbAccess
 {
-	public class ForeignKeySchema
-	{
-	    public string TableName;
+    public class ForeignKeySchema
+    {
+        public string TableName { get; set; }
 
-		public string ColumnName;
+        public string ColumnName { get; set; }
 
-		public string ForeignTableName;
+        public string ForeignTableName { get; set; }
 
-		public string ForeignColumnName;
+        public string ForeignColumnName { get; set; }
 
-	    public bool CascadeOnDelete;
+        public bool CascadeOnDelete { get; set; }
 
-	    public bool IsNullable;
-	}
+        public bool IsNullable { get; set; }
+    }
 }

@@ -1,35 +1,36 @@
-Ôªøusing System;
-using System.Collections.Generic;
-using System.Text;
-using System.Data;
-using System.Data.SqlClient;
-using System.Data.SQLite;
-using System.Threading;
-using System.Text.RegularExpressions;
-using System.IO;
-using log4net;
-
 namespace DbAccess
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Data;
+    using System.Data.SqlClient;
+    using System.Data.SQLite;
+    using System.IO;
+    using System.Text;
+    using System.Text.RegularExpressions;
+    using System.Threading;
+
+    using log4net;
+
     /// <summary>
-    /// This class is resposible to take a single SQL Server database
+    /// This class is responsible to take a single SQL Server database
     /// and convert it to an SQLite database file.
     /// </summary>
     /// <remarks>The class knows how to convert table and index structures only.</remarks>
     public class SqlServerToSQLite
     {
         #region Public Properties
+
         /// <summary>
         /// Gets a value indicating whether this instance is active.
         /// </summary>
         /// <value><c>true</c> if this instance is active; otherwise, <c>false</c>.</value>
-        public static bool IsActive
-        {
-            get { return _isActive; }
-        }
+        public static bool IsActive { get; private set; }
+
         #endregion
 
         #region Public Methods
+
         /// <summary>
         /// Cancels the conversion.
         /// </summary>
@@ -50,37 +51,43 @@ namespace DbAccess
         /// <param name="selectionHandler">The selection handler that allows the user to select which
         /// tables to convert</param>
         /// <remarks>The method continues asynchronously in the background and the caller returned
-        /// immediatly.</remarks>
-        public static void ConvertSqlServerToSQLiteDatabase(string sqlServerConnString,
-            string sqlitePath, string password, SqlConversionHandler handler,
+        /// immediately.</remarks>
+        public static void ConvertSqlServerToSQLiteDatabase(
+            string sqlServerConnString,
+            string sqlitePath,
+            string password,
+            SqlConversionHandler handler,
             SqlTableSelectionHandler selectionHandler,
             FailedViewDefinitionHandler viewFailureHandler,
-            bool createTriggers, bool createViews)
+            bool createTriggers,
+            bool createViews)
         {
             // Clear cancelled flag
             _cancelled = false;
 
-            WaitCallback wc = new WaitCallback(delegate(object state)
-            {
-                try
+            var wc = new WaitCallback(delegate (object state)
                 {
-                    _isActive = true;
-                    ConvertSqlServerDatabaseToSQLiteFile(sqlServerConnString, sqlitePath, password, handler, selectionHandler, viewFailureHandler, createTriggers, createViews);
-                    _isActive = false;
-                    handler(true, true, 100, "Finished converting database");
-                }
-                catch (Exception ex)
-                {
-                    _log.Error("Failed to convert SQL Server database to SQLite database", ex);
-                    _isActive = false;
-                    handler(true, false, 100, ex.Message);
-                } // catch
-            });
+                    try
+                    {
+                        IsActive = true;
+                        ConvertSqlServerDatabaseToSQLiteFile(sqlServerConnString, sqlitePath, password, handler, selectionHandler, viewFailureHandler, createTriggers, createViews);
+                        IsActive = false;
+                        handler(true, true, 100, "Finished converting database");
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.Error("Failed to convert SQL Server database to SQLite database", ex);
+                        IsActive = false;
+                        handler(true, false, 100, ex.Message);
+                    } // catch
+                });
             ThreadPool.QueueUserWorkItem(wc);
         }
+
         #endregion
 
         #region Private Methods
+
         /// <summary>
         /// Do the entire process of first reading the SQL Server schema, creating a corresponding
         /// SQLite schema, and copying all rows from the SQL Server database to the SQLite database.
@@ -92,17 +99,22 @@ namespace DbAccess
         /// <param name="selectionHandler">The selection handler which allows the user to select which tables to 
         /// convert.</param>
         private static void ConvertSqlServerDatabaseToSQLiteFile(
-            string sqlConnString, string sqlitePath, string password, SqlConversionHandler handler,
+            string sqlConnString,
+            string sqlitePath,
+            string password,
+            SqlConversionHandler handler,
             SqlTableSelectionHandler selectionHandler,
             FailedViewDefinitionHandler viewFailureHandler,
             bool createTriggers, bool createViews)
         {
             // Delete the target file if it exists already.
             if (File.Exists(sqlitePath))
+            {
                 File.Delete(sqlitePath);
+            }
 
             // Read the schema of the SQL Server database into a memory structure
-            DatabaseSchema ds = ReadSqlServerSchema(sqlConnString, handler, selectionHandler);
+            var ds = ReadSqlServerSchema(sqlConnString, handler, selectionHandler);
 
             // Create the SQLite database and apply the schema
             CreateSQLiteDatabase(sqlitePath, ds, password, handler, viewFailureHandler, createViews);
@@ -112,7 +124,9 @@ namespace DbAccess
 
             // Add triggers based on foreign key constraints
             if (createTriggers)
-                AddTriggersForForeignKeys(sqlitePath, ds.Tables, password, handler);
+            {
+                AddTriggersForForeignKeys(sqlitePath, ds.Tables, password);
+            }
 
         }
 
@@ -125,75 +139,89 @@ namespace DbAccess
         /// <param name="password">The password to use for encrypting the file</param>
         /// <param name="handler">A handler to handle progress notifications.</param>
         private static void CopySqlServerRowsToSQLiteDB(
-            string sqlConnString, string sqlitePath, List<TableSchema> schema,
-            string password, SqlConversionHandler handler)
+            string sqlConnString,
+            string sqlitePath,
+            List<TableSchema> schema,
+            string password,
+            SqlConversionHandler handler)
         {
             CheckCancelled();
             handler(false, true, 0, "Preparing to insert tables...");
             _log.Debug("preparing to insert tables ...");
 
             // Connect to the SQL Server database
-            using (SqlConnection ssconn = new SqlConnection(sqlConnString))
+            using (var ssconn = new SqlConnection(sqlConnString))
             {
                 ssconn.Open();
 
                 // Connect to the SQLite database next
-                string sqliteConnString = CreateSQLiteConnectionString(sqlitePath, password);
-                using (SQLiteConnection sqconn = new SQLiteConnection(sqliteConnString))
+                var sqliteConnString = CreateSQLiteConnectionString(sqlitePath, password);
+                using (var sqconn = new SQLiteConnection(sqliteConnString))
                 {
                     sqconn.Open();
 
                     // Go over all tables in the schema and copy their rows
-                    for (int i = 0; i < schema.Count; i++)
+                    for (var i = 0; i < schema.Count; i++)
                     {
-                        SQLiteTransaction tx = sqconn.BeginTransaction();
+                        var tx = sqconn.BeginTransaction();
                         try
                         {
-                            string tableQuery = BuildSqlServerTableQuery(schema[i]);
-                            SqlCommand query = new SqlCommand(tableQuery, ssconn);
-                            using (SqlDataReader reader = query.ExecuteReader())
+                            var tableQuery = BuildSqlServerTableQuery(schema[i]);
+                            var query = new SqlCommand(tableQuery, ssconn);
+                            using (var reader = query.ExecuteReader())
                             {
-                                SQLiteCommand insert = BuildSQLiteInsert(schema[i]);
-                                int counter = 0;
+                                var insert = BuildSQLiteInsert(schema[i]);
+                                var counter = 0;
                                 while (reader.Read())
                                 {
                                     insert.Connection = sqconn;
                                     insert.Transaction = tx;
-                                    List<string> pnames = new List<string>();
-                                    for (int j = 0; j < schema[i].Columns.Count; j++)
+                                    var pnames = new List<string>();
+                                    for (var j = 0; j < schema[i].Columns.Count; j++)
                                     {
-                                        string pname = "@" + GetNormalizedName(schema[i].Columns[j].ColumnName, pnames);
-                                        insert.Parameters[pname].Value = CastValueForColumn(reader[j], schema[i].Columns[j]);
+                                        var pname = $"@{GetNormalizedName(schema[i].Columns[j].ColumnName, pnames)}";
+                                        insert.Parameters[pname].Value = CastValueForColumn(
+                                            reader[j],
+                                            schema[i].Columns[j]);
                                         pnames.Add(pname);
                                     }
+
                                     insert.ExecuteNonQuery();
                                     counter++;
-                                    if (counter % 1000 == 0)
+                                    if (counter % 1000 != 0)
                                     {
-                                        CheckCancelled();
-                                        tx.Commit();
-                                        handler(false, true, (int)(100.0 * i / schema.Count),
-                                            "Added " + counter + " rows to table " + schema[i].TableName + " so far");
-                                        tx = sqconn.BeginTransaction();
+                                        continue;
                                     }
-                                } // while
-                            } // using
+                                    CheckCancelled();
+                                    tx.Commit();
+                                    handler(
+                                        false,
+                                        true,
+                                        (int)(100.0 * i / schema.Count),
+                                        $"Added {counter} rows to table {schema[i].TableName} so far");
+                                    tx = sqconn.BeginTransaction();
+                                }
+                            }
 
                             CheckCancelled();
                             tx.Commit();
 
-                            handler(false, true, (int)(100.0 * i / schema.Count), "Finished inserting rows for table " + schema[i].TableName);
-                            _log.Debug("finished inserting all rows for table [" + schema[i].TableName + "]");
+                            handler(
+                                false,
+                                true,
+                                (int)(100.0 * i / schema.Count),
+                                $"Finished inserting rows for table {schema[i].TableName}");
+                            _log.Debug($"finished inserting all rows for table [{schema[i].TableName}]");
                         }
                         catch (Exception ex)
                         {
                             _log.Error("unexpected exception", ex);
                             tx.Rollback();
                             throw;
-                        } // catch
+                        }
                     }
-                } // using
-            } // using
+                }
+            }
         }
 
         /// <summary>
@@ -207,69 +235,93 @@ namespace DbAccess
             if (val is DBNull)
                 return null;
 
-            DbType dt = GetDbTypeOfColumn(columnSchema);
+            var dt = GetDbTypeOfColumn(columnSchema);
 
             switch (dt)
             {
                 case DbType.Int32:
-                    if (val is short)
-                        return (int)(short)val;
-                    if (val is byte)
-                        return (int)(byte)val;
-                    if (val is long)
-                        return (int)(long)val;
-                    if (val is decimal)
-                        return (int)(decimal)val;
+                    switch (val)
+                    {
+                        case short s:
+                            return (int) s;
+                        case byte b:
+                            return (int) b;
+                        case long l:
+                            return (int) l;
+                        case decimal val1:
+                            return (int) val1;
+                    }
+
                     break;
 
                 case DbType.Int16:
-                    if (val is int)
-                        return (short)(int)val;
-                    if (val is byte)
-                        return (short)(byte)val;
-                    if (val is long)
-                        return (short)(long)val;
-                    if (val is decimal)
-                        return (short)(decimal)val;
+                    switch (val)
+                    {
+                        case int i:
+                            return (short) i;
+                        case byte b1:
+                            return (short) b1;
+                        case long l1:
+                            return (short) l1;
+                        case decimal val2:
+                            return (short) val2;
+                    }
+
                     break;
 
                 case DbType.Int64:
-                    if (val is int)
-                        return (long)(int)val;
-                    if (val is short)
-                        return (long)(short)val;
-                    if (val is byte)
-                        return (long)(byte)val;
-                    if (val is decimal)
-                        return (long)(decimal)val;
+                    switch (val)
+                    {
+                        case int i1:
+                            return (long) i1;
+                        case short s1:
+                            return (long) s1;
+                        case byte b2:
+                            return (long) b2;
+                        case decimal val3:
+                            return (long) val3;
+                    }
+
                     break;
 
                 case DbType.Single:
-                    if (val is double)
-                        return (float)(double)val;
-                    if (val is decimal)
-                        return (float)(decimal)val;
+                    switch (val)
+                    {
+                        case double d:
+                            return (float) d;
+                        case decimal val4:
+                            return (float) val4;
+                    }
+
                     break;
 
                 case DbType.Double:
-                    if (val is float)
-                        return (double)(float)val;
-                    if (val is double)
-                        return (double)val;
-                    if (val is decimal)
-                        return (double)(decimal)val;
+                    switch (val)
+                    {
+                        case float f:
+                            return (double) f;
+                        case double d1:
+                            return d1;
+                        case decimal val5:
+                            return (double) val5;
+                    }
+
                     break;
 
                 case DbType.String:
-                    if (val is Guid)
-                        return ((Guid)val).ToString();
+                    if (val is Guid guid)
+                        return guid.ToString();
                     break;
 
                 case DbType.Guid:
-                    if (val is string)
-                        return ParseStringAsGuid((string)val);
-                    if (val is byte[])
-                        return ParseBlobAsGuid((byte[])val);
+                    switch (val)
+                    {
+                        case string s2:
+                            return ParseStringAsGuid(s2);
+                        case byte[] bytes:
+                            return ParseBlobAsGuid(bytes);
+                    }
+
                     break;
 
                 case DbType.Binary:
@@ -279,7 +331,7 @@ namespace DbAccess
 
                 default:
                     _log.Error("argument exception - illegal database type");
-                    throw new ArgumentException("Illegal database type [" + Enum.GetName(typeof(DbType), dt) + "]");
+                    throw new ArgumentException($"Illegal database type [{Enum.GetName(typeof(DbType), dt)}]");
             } // switch
 
             return val;
@@ -287,17 +339,17 @@ namespace DbAccess
 
         private static Guid ParseBlobAsGuid(byte[] blob)
         {
-            byte[] data = blob;
+            var data = blob;
             if (blob.Length > 16)
             {
                 data = new byte[16];
-                for (int i = 0; i < 16; i++)
+                for (var i = 0; i < 16; i++)
                     data[i] = blob[i];
             }
             else if (blob.Length < 16)
             {
                 data = new byte[16];
-                for (int i = 0; i < blob.Length; i++)
+                for (var i = 0; i < blob.Length; i++)
                     data[i] = blob[i];
             }
 
@@ -310,10 +362,11 @@ namespace DbAccess
             {
                 return new Guid(str);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return Guid.Empty;
-            } // catch
+            }
+ // catch
         }
 
         /// <summary>
@@ -323,33 +376,37 @@ namespace DbAccess
         /// <returns>A command object with the required functionality.</returns>
         private static SQLiteCommand BuildSQLiteInsert(TableSchema ts)
         {
-            SQLiteCommand res = new SQLiteCommand();
+            var res = new SQLiteCommand();
 
-            StringBuilder sb = new StringBuilder();
-            sb.Append("INSERT INTO [" + ts.TableName + "] (");
-            for (int i = 0; i < ts.Columns.Count; i++)
+            var sb = new StringBuilder();
+            sb.Append($"INSERT INTO [{ts.TableName}] (");
+            for (var i = 0; i < ts.Columns.Count; i++)
             {
-                sb.Append("[" + ts.Columns[i].ColumnName + "]");
+                sb.Append($"[{ts.Columns[i].ColumnName}]");
                 if (i < ts.Columns.Count - 1)
                     sb.Append(", ");
-            } // for
+            }
+ // for
+
             sb.Append(") VALUES (");
 
-            List<string> pnames = new List<string>();
-            for (int i = 0; i < ts.Columns.Count; i++)
+            var pnames = new List<string>();
+            for (var i = 0; i < ts.Columns.Count; i++)
             {
-                string pname = "@" + GetNormalizedName(ts.Columns[i].ColumnName, pnames);
+                var pname = $"@{GetNormalizedName(ts.Columns[i].ColumnName, pnames)}";
                 sb.Append(pname);
                 if (i < ts.Columns.Count - 1)
                     sb.Append(", ");
 
-                DbType dbType = GetDbTypeOfColumn(ts.Columns[i]);
-                SQLiteParameter prm = new SQLiteParameter(pname, dbType, ts.Columns[i].ColumnName);
+                var dbType = GetDbTypeOfColumn(ts.Columns[i]);
+                var prm = new SQLiteParameter(pname, dbType, ts.Columns[i].ColumnName);
                 res.Parameters.Add(prm);
 
                 // Remember the parameter name in order to avoid duplicates
                 pnames.Add(pname);
-            } // for
+            }
+ // for
+
             sb.Append(")");
             res.CommandText = sb.ToString();
             res.CommandType = CommandType.Text;
@@ -366,18 +423,19 @@ namespace DbAccess
         /// <returns>A normalized name</returns>
         private static string GetNormalizedName(string str, List<string> names)
         {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < str.Length; i++)
+            var sb = new StringBuilder();
+            for (var i = 0; i < str.Length; i++)
             {
-                if (Char.IsLetterOrDigit(str[i]) || str[i] == '_')
+                if (char.IsLetterOrDigit(str[i]) || str[i] == '_')
                     sb.Append(str[i]);
                 else
                     sb.Append("_");
-            } // for
+            }
+ // for
 
             // Avoid returning duplicate name
             if (names.Contains(sb.ToString()))
-                return GetNormalizedName(sb.ToString() + "_", names);
+                return GetNormalizedName($"{sb}_", names);
             else
                 return sb.ToString();
         }
@@ -389,42 +447,53 @@ namespace DbAccess
         /// <returns>The matched DB type</returns>
         private static DbType GetDbTypeOfColumn(ColumnSchema cs)
         {
-            if (cs.ColumnType == "tinyint")
-                return DbType.Byte;
-            if (cs.ColumnType == "int")
-                return DbType.Int32;
-            if (cs.ColumnType == "smallint")
-                return DbType.Int16;
-            if (cs.ColumnType == "bigint")
-                return DbType.Int64;
-            if (cs.ColumnType == "bit")
-                return DbType.Boolean;
-            if (cs.ColumnType == "nvarchar" || cs.ColumnType == "varchar" ||
-                cs.ColumnType == "text" || cs.ColumnType == "ntext")
-                return DbType.String;
-            if (cs.ColumnType == "float")
-                return DbType.Double;
-            if (cs.ColumnType == "real")
-                return DbType.Single;
-            if (cs.ColumnType == "blob")
-                return DbType.Binary;
-            if (cs.ColumnType == "numeric")
-                return DbType.Double;
-            if (cs.ColumnType == "timestamp" || cs.ColumnType == "datetime" || cs.ColumnType == "datetime2" || cs.ColumnType == "date" || cs.ColumnType == "time")
-                return DbType.DateTime;
-            if (cs.ColumnType == "nchar" || cs.ColumnType == "char")
-                return DbType.String;
-            if (cs.ColumnType == "uniqueidentifier" || cs.ColumnType == "guid")
-                return DbType.Guid;
-            if (cs.ColumnType == "xml")
-                return DbType.String;
-            if (cs.ColumnType == "sql_variant")
-                return DbType.Object;
-            if (cs.ColumnType == "integer")
-                return DbType.Int64;
-
-            _log.Error("illegal db type found");
-            throw new ApplicationException("Illegal DB type found (" + cs.ColumnType + ")");
+            switch (cs.ColumnType)
+            {
+                case "tinyint":
+                    return DbType.Byte;
+                case "int":
+                    return DbType.Int32;
+                case "smallint":
+                    return DbType.Int16;
+                case "bigint":
+                    return DbType.Int64;
+                case "bit":
+                    return DbType.Boolean;
+                case "nvarchar":
+                case "varchar":
+                case "text":
+                case "ntext":
+                    return DbType.String;
+                case "float":
+                    return DbType.Double;
+                case "real":
+                    return DbType.Single;
+                case "blob":
+                    return DbType.Binary;
+                case "numeric":
+                    return DbType.Double;
+                case "timestamp":
+                case "datetime":
+                case "datetime2":
+                case "date":
+                case "time":
+                    return DbType.DateTime;
+                case "nchar":
+                case "char":
+                    return DbType.String;
+                case "uniqueidentifier":
+                case "guid":
+                    return DbType.Guid;
+                case "xml":
+                    return DbType.String;
+                case "sql_variant":
+                    return DbType.Object;
+                case "integer":
+                    return DbType.Int64;
+                default:
+                    _log.Error("illegal db type found");
+                    throw new ApplicationException($"Illegal DB type found ({cs.ColumnType})");
+            }
         }
 
         /// <summary>
@@ -435,15 +504,18 @@ namespace DbAccess
         /// <returns>The SELECT query for the table.</returns>
         private static string BuildSqlServerTableQuery(TableSchema ts)
         {
-            StringBuilder sb = new StringBuilder();
+            var sb = new StringBuilder();
             sb.Append("SELECT ");
-            for (int i = 0; i < ts.Columns.Count; i++)
+            for (var i = 0; i < ts.Columns.Count; i++)
             {
-                sb.Append("[" + ts.Columns[i].ColumnName + "]");
+                sb.Append($"[{ts.Columns[i].ColumnName}]");
                 if (i < ts.Columns.Count - 1)
+                {
                     sb.Append(", ");
-            } // for
-            sb.Append(" FROM " + ts.TableSchemaName + "." + "[" + ts.TableName + "]");
+                }
+            }
+
+            sb.Append($" FROM {ts.TableSchemaName}.[{ts.TableName}]");
             return sb.ToString();
         }
 
@@ -454,7 +526,10 @@ namespace DbAccess
         /// <param name="schema">The schema of the SQL server database.</param>
         /// <param name="password">The password to use for encrypting the DB or null if non is needed.</param>
         /// <param name="handler">A handle for progress notifications.</param>
-        private static void CreateSQLiteDatabase(string sqlitePath, DatabaseSchema schema, string password,
+        private static void CreateSQLiteDatabase(
+            string sqlitePath,
+            DatabaseSchema schema,
+            string password,
             SqlConversionHandler handler,
             FailedViewDefinitionHandler viewFailureHandler, bool createViews)
         {
@@ -463,17 +538,17 @@ namespace DbAccess
             // Create the SQLite database file
             SQLiteConnection.CreateFile(sqlitePath);
 
-            _log.Debug("SQLite file was created successfully at [" + sqlitePath + "]");
+            _log.Debug($"SQLite file was created successfully at [{sqlitePath}]");
 
             // Connect to the newly created database
-            string sqliteConnString = CreateSQLiteConnectionString(sqlitePath, password);
-            using (SQLiteConnection conn = new SQLiteConnection(sqliteConnString))
+            var sqliteConnString = CreateSQLiteConnectionString(sqlitePath, password);
+            using (var conn = new SQLiteConnection(sqliteConnString))
             {
                 conn.Open();
 
                 // Create all tables in the new database
-                int count = 0;
-                foreach (TableSchema dt in schema.Tables)
+                var count = 0;
+                foreach (var dt in schema.Tables)
                 {
                     try
                     {
@@ -484,18 +559,23 @@ namespace DbAccess
                         _log.Error("AddSQLiteTable failed", ex);
                         throw;
                     }
+
                     count++;
                     CheckCancelled();
-                    handler(false, true, (int)(count * 50.0 / schema.Tables.Count), "Added table " + dt.TableName + " to the SQLite database");
+                    handler(
+                        false,
+                        true,
+                        (int) (count * 50.0 / schema.Tables.Count),
+                        $"Added table {dt.TableName} to the SQLite database");
 
-                    _log.Debug("added schema for SQLite table [" + dt.TableName + "]");
-                } // foreach
+                    _log.Debug($"added schema for SQLite table [{dt.TableName}]");
+                }
 
                 // Create all views in the new database
                 count = 0;
                 if (createViews)
                 {
-                    foreach (ViewSchema vs in schema.Views)
+                    foreach (var vs in schema.Views)
                     {
                         try
                         {
@@ -506,15 +586,19 @@ namespace DbAccess
                             _log.Error("AddSQLiteView failed", ex);
                             throw;
                         } // catch
+
                         count++;
                         CheckCancelled();
-                        handler(false, true, 50 + (int)(count * 50.0 / schema.Views.Count), "Added view " + vs.ViewName + " to the SQLite database");
+                        handler(
+                            false,
+                            true,
+                            50 + (int)(count * 50.0 / schema.Views.Count),
+                            $"Added view {vs.ViewName} to the SQLite database");
 
                         _log.Debug("added schema for SQLite view [" + vs.ViewName + "]");
-
-                    } // foreach
-                } // if
-            } // using
+                    }
+                }
+            }
 
             _log.Debug("finished adding all table/view schemas for SQLite database");
         }
@@ -522,30 +606,28 @@ namespace DbAccess
         private static void AddSQLiteView(SQLiteConnection conn, ViewSchema vs, FailedViewDefinitionHandler handler)
         {
             // Prepare a CREATE VIEW DDL statement
-            string stmt = vs.ViewSQL;
-            _log.Info("\n\n" + stmt + "\n\n");
+            var stmt = vs.ViewSQL;
+            _log.Info($"\n\n{stmt}\n\n");
 
             // Execute the query in order to actually create the view.
-            SQLiteTransaction tx = conn.BeginTransaction();
+            var tx = conn.BeginTransaction();
             try
             {
-                SQLiteCommand cmd = new SQLiteCommand(stmt, conn, tx);
+                var cmd = new SQLiteCommand(stmt, conn, tx);
                 cmd.ExecuteNonQuery();
 
                 tx.Commit();
             }
-            catch (SQLiteException ex)
+            catch (SQLiteException)
             {
                 tx.Rollback();
 
                 if (handler != null)
                 {
-                    ViewSchema updated = new ViewSchema();
-                    updated.ViewName = vs.ViewName;
-                    updated.ViewSQL = vs.ViewSQL;
+                    var updated = new ViewSchema {ViewName = vs.ViewName, ViewSQL = vs.ViewSQL};
 
                     // Ask the user to supply the new view definition SQL statement
-                    string sql = handler(updated);
+                    var sql = handler(updated);
 
                     if (sql == null)
                         return; // Discard the view
@@ -558,7 +640,8 @@ namespace DbAccess
                 }
                 else
                     throw;
-            } // catch
+            }
+ // catch
         }
 
         /// <summary>
@@ -569,12 +652,12 @@ namespace DbAccess
         private static void AddSQLiteTable(SQLiteConnection conn, TableSchema dt)
         {
             // Prepare a CREATE TABLE DDL statement
-            string stmt = BuildCreateTableQuery(dt);
+            var stmt = BuildCreateTableQuery(dt);
 
-            _log.Info("\n\n" + stmt + "\n\n");
+            _log.Info($"\n\n{stmt}\n\n");
 
             // Execute the query in order to actually create the table.
-            SQLiteCommand cmd = new SQLiteCommand(stmt, conn);
+            var cmd = new SQLiteCommand(stmt, conn);
             cmd.ExecuteNonQuery();
         }
 
@@ -586,50 +669,61 @@ namespace DbAccess
         /// <returns>CREATE TABLE DDL for the specified table.</returns>
         private static string BuildCreateTableQuery(TableSchema ts)
         {
-            StringBuilder sb = new StringBuilder();
+            var sb = new StringBuilder();
 
-            sb.Append("CREATE TABLE [" + ts.TableName + "] (\n");
+            sb.Append($"CREATE TABLE [{ts.TableName}] (\n");
 
-            bool pkey = false;
-            for (int i = 0; i < ts.Columns.Count; i++)
+            var pkey = false;
+            for (var i = 0; i < ts.Columns.Count; i++)
             {
-                ColumnSchema col = ts.Columns[i];
-                string cline = BuildColumnStatement(col, ts, ref pkey);
+                var col = ts.Columns[i];
+                var cline = BuildColumnStatement(col, ts, ref pkey);
                 sb.Append(cline);
                 if (i < ts.Columns.Count - 1)
+                {
                     sb.Append(",\n");
-            } // foreach
+                }
+            }
 
             // add primary keys...
             if (ts.PrimaryKey != null && ts.PrimaryKey.Count > 0 & !pkey)
             {
                 sb.Append(",\n");
                 sb.Append("    PRIMARY KEY (");
-                for (int i = 0; i < ts.PrimaryKey.Count; i++)
+                for (var i = 0; i < ts.PrimaryKey.Count; i++)
                 {
-                    sb.Append("[" + ts.PrimaryKey[i] + "]");
+                    sb.Append($"[{ts.PrimaryKey[i]}]");
                     if (i < ts.PrimaryKey.Count - 1)
+                    {
                         sb.Append(", ");
-                } // for
+                    }
+                }
+
                 sb.Append(")\n");
             }
             else
+            {
                 sb.Append("\n");
+            }
 
             // add foreign keys...
             if (ts.ForeignKeys.Count > 0)
             {
                 sb.Append(",\n");
-                for (int i = 0; i < ts.ForeignKeys.Count; i++)
+                for (var i = 0; i < ts.ForeignKeys.Count; i++)
                 {
-                    ForeignKeySchema foreignKey = ts.ForeignKeys[i];
-                    string stmt = string.Format("    FOREIGN KEY ([{0}])\n        REFERENCES [{1}]([{2}])",
-                                foreignKey.ColumnName, foreignKey.ForeignTableName, foreignKey.ForeignColumnName);
+                    var foreignKey = ts.ForeignKeys[i];
+                    var stmt = string.Format(
+                        "    FOREIGN KEY ([{0}])\n        REFERENCES [{1}]([{2}])",
+                        foreignKey.ColumnName,
+                        foreignKey.ForeignTableName,
+                        foreignKey.ForeignColumnName);
 
                     sb.Append(stmt);
                     if (i < ts.ForeignKeys.Count - 1)
                         sb.Append(",\n");
-                } // for
+                }
+ // for
             }
 
             sb.Append("\n");
@@ -638,14 +732,16 @@ namespace DbAccess
             // Create any relevant indexes
             if (ts.Indexes != null)
             {
-                for (int i = 0; i < ts.Indexes.Count; i++)
+                for (var i = 0; i < ts.Indexes.Count; i++)
                 {
-                    string stmt = BuildCreateIndex(ts.TableName, ts.Indexes[i]);
-                    sb.Append(stmt + ";\n");
-                } // for
-            } // if
+                    var stmt = BuildCreateIndex(ts.TableName, ts.Indexes[i]);
+                    sb.Append($"{stmt};\n");
+                }
+ // for
+            }
+ // if
 
-            string query = sb.ToString();
+            var query = sb.ToString();
             return query;
         }
 
@@ -657,21 +753,23 @@ namespace DbAccess
         /// <returns>A CREATE INDEX DDL (SQLite format).</returns>
         private static string BuildCreateIndex(string tableName, IndexSchema indexSchema)
         {
-            StringBuilder sb = new StringBuilder();
+            var sb = new StringBuilder();
             sb.Append("CREATE ");
             if (indexSchema.IsUnique)
                 sb.Append("UNIQUE ");
-            sb.Append("INDEX [" + tableName + "_" + indexSchema.IndexName + "]\n");
-            sb.Append("ON [" + tableName + "]\n");
+            sb.Append($"INDEX [{tableName}_{indexSchema.IndexName}]\n");
+            sb.Append($"ON [{tableName}]\n");
             sb.Append("(");
-            for (int i = 0; i < indexSchema.Columns.Count; i++)
+            for (var i = 0; i < indexSchema.Columns.Count; i++)
             {
-                sb.Append("[" + indexSchema.Columns[i].ColumnName + "]");
+                sb.Append($"[{indexSchema.Columns[i].ColumnName}]");
                 if (!indexSchema.Columns[i].IsAscending)
                     sb.Append(" DESC");
                 if (i < indexSchema.Columns.Count - 1)
                     sb.Append(", ");
-            } // for
+            }
+ // for
+
             sb.Append(")");
 
             return sb.ToString();
@@ -685,14 +783,16 @@ namespace DbAccess
         /// <returns>A single column line to be inserted into the general CREATE TABLE DDL statement</returns>
         private static string BuildColumnStatement(ColumnSchema col, TableSchema ts, ref bool pkey)
         {
-            StringBuilder sb = new StringBuilder();
-            sb.Append("\t[" + col.ColumnName + "]\t");
+            var sb = new StringBuilder();
+            sb.Append($"\t[{col.ColumnName}]\t");
 
             // Special treatment for IDENTITY columns
             if (col.IsIdentity)
             {
-                if (ts.PrimaryKey.Count == 1 && (col.ColumnType == "tinyint" || col.ColumnType == "int" || col.ColumnType == "smallint" ||
-                    col.ColumnType == "bigint" || col.ColumnType == "integer"))
+                if (ts.PrimaryKey.Count == 1 && (col.ColumnType == "tinyint" || col.ColumnType == "int"
+                                                                             || col.ColumnType == "smallint"
+                                                                             || col.ColumnType == "bigint"
+                                                                             || col.ColumnType == "integer"))
                 {
                     sb.Append("integer PRIMARY KEY AUTOINCREMENT");
                     pkey = true;
@@ -708,25 +808,27 @@ namespace DbAccess
                 {
                     sb.Append(col.ColumnType);
                 }
+
                 if (col.Length > 0)
-                    sb.Append("(" + col.Length + ")");
+                    sb.Append($"({col.Length})");
             }
+
             if (!col.IsNullable)
                 sb.Append(" NOT NULL");
 
-            if (col.IsCaseSensitivite.HasValue && !col.IsCaseSensitivite.Value)
+            if (col.IsCaseSensitive.HasValue && !col.IsCaseSensitive.Value)
                 sb.Append(" COLLATE NOCASE");
 
-            string defval = StripParens(col.DefaultValue);
+            var defval = StripParens(col.DefaultValue);
             defval = DiscardNational(defval);
-            _log.Debug("DEFAULT VALUE BEFORE [" + col.DefaultValue + "] AFTER [" + defval + "]");
+            _log.Debug($"DEFAULT VALUE BEFORE [{col.DefaultValue}] AFTER [{defval}]");
             if (defval != string.Empty && defval.ToUpper().Contains("GETDATE"))
             {
-                _log.Debug("converted SQL Server GETDATE() to CURRENT_TIMESTAMP for column [" + col.ColumnName + "]");
+                _log.Debug($"converted SQL Server GETDATE() to CURRENT_TIMESTAMP for column [{col.ColumnName}]");
                 sb.Append(" DEFAULT (CURRENT_TIMESTAMP)");
             }
             else if (defval != string.Empty && IsValidDefaultValue(defval))
-                sb.Append(" DEFAULT " + defval);
+                sb.Append($" DEFAULT {defval}");
 
             return sb.ToString();
         }
@@ -739,8 +841,8 @@ namespace DbAccess
         /// <returns></returns>
         private static string DiscardNational(string value)
         {
-            Regex rx = new Regex(@"N\'([^\']*)\'");
-            Match m = rx.Match(value);
+            var rx = new Regex(@"N\'([^\']*)\'");
+            var m = rx.Match(value);
             if (m.Success)
                 return m.Groups[1].Value;
             else
@@ -755,20 +857,17 @@ namespace DbAccess
         private static bool IsValidDefaultValue(string value)
         {
             if (IsSingleQuoted(value))
+            {
                 return true;
+            }
 
-            double testnum;
-            if (!double.TryParse(value, out testnum))
-                return false;
-            return true;
+            return double.TryParse(value, out _);
         }
 
         private static bool IsSingleQuoted(string value)
         {
             value = value.Trim();
-            if (value.StartsWith("'") && value.EndsWith("'"))
-                return true;
-            return false;
+            return value.StartsWith("'") && value.EndsWith("'");
         }
 
         /// <summary>
@@ -778,12 +877,9 @@ namespace DbAccess
         /// <returns>The stripped string</returns>
         private static string StripParens(string value)
         {
-            Regex rx = new Regex(@"\(([^\)]*)\)");
-            Match m = rx.Match(value);
-            if (!m.Success)
-                return value;
-            else
-                return StripParens(m.Groups[1].Value);
+            var rx = new Regex(@"\(([^\)]*)\)");
+            var m = rx.Match(value);
+            return !m.Success ? value : StripParens(m.Groups[1].Value);
         }
 
         /// <summary>
@@ -794,21 +890,25 @@ namespace DbAccess
         /// <param name="selectionHandler">The selection handler which allows the user to select 
         /// which tables to convert.</param>
         /// <returns>database schema objects for every table/view in the SQL Server database.</returns>
-        private static DatabaseSchema ReadSqlServerSchema(string connString, SqlConversionHandler handler,
+        private static DatabaseSchema ReadSqlServerSchema(
+            string connString,
+            SqlConversionHandler handler,
             SqlTableSelectionHandler selectionHandler)
         {
             // First step is to read the names of all tables in the database
-            List<TableSchema> tables = new List<TableSchema>();
-            using (SqlConnection conn = new SqlConnection(connString))
+            var tables = new List<TableSchema>();
+            using (var conn = new SqlConnection(connString))
             {
                 conn.Open();
 
-                List<string> tableNames = new List<string>();
-                List<string> tblschema = new List<string>();
+                var tableNames = new List<string>();
+                var tblschema = new List<string>();
 
                 // This command will read the names of all tables in the database
-                SqlCommand cmd = new SqlCommand(@"select * from INFORMATION_SCHEMA.TABLES  where TABLE_TYPE = 'BASE TABLE'", conn);
-                using (SqlDataReader reader = cmd.ExecuteReader())
+                var cmd = new SqlCommand(
+                    @"select * from INFORMATION_SCHEMA.TABLES  where TABLE_TYPE = 'BASE TABLE'",
+                    conn);
+                using (var reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
                     {
@@ -816,60 +916,64 @@ namespace DbAccess
                             continue;
                         if (reader["TABLE_SCHEMA"] == DBNull.Value)
                             continue;
-                        tableNames.Add((string)reader["TABLE_NAME"]);
-                        tblschema.Add((string)reader["TABLE_SCHEMA"]);
-                    } // while
-                } // using
+                        tableNames.Add((string) reader["TABLE_NAME"]);
+                        tblschema.Add((string) reader["TABLE_SCHEMA"]);
+                    }
+ // while
+                }
+ // using
 
                 // Next step is to use ADO APIs to query the schema of each table.
-                int count = 0;
-                for (int i = 0; i < tableNames.Count; i++)
+                var count = 0;
+                for (var i = 0; i < tableNames.Count; i++)
                 {
-                    string tname = tableNames[i];
-                    string tschma = tblschema[i];
-                    TableSchema ts = CreateTableSchema(conn, tname, tschma);
+                    var tname = tableNames[i];
+                    var tschma = tblschema[i];
+                    var ts = CreateTableSchema(conn, tname, tschma);
                     CreateForeignKeySchema(conn, ts);
                     tables.Add(ts);
                     count++;
                     CheckCancelled();
-                    handler(false, true, (int)(count * 50.0 / tableNames.Count), "Parsed table " + tname);
+                    handler(false, true, (int) (count * 50.0 / tableNames.Count), $"Parsed table {tname}");
 
-                    _log.Debug("parsed table schema for [" + tname + "]");
-                } // foreach
-            } // using
+                    _log.Debug($"parsed table schema for [{tname}]");
+                }
+            }
+ // using
 
             _log.Debug("finished parsing all tables in SQL Server schema");
 
             // Allow the user a chance to select which tables to convert
             if (selectionHandler != null)
             {
-                List<TableSchema> updated = selectionHandler(tables);
+                var updated = selectionHandler(tables);
                 if (updated != null)
                     tables = updated;
-            } // if
+            }
+ // if
 
-            Regex removedbo = new Regex(@"dbo\.", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            var removedbo = new Regex(@"dbo\.", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
             // Continue and read all of the views in the database
-            List<ViewSchema> views = new List<ViewSchema>();
-            using (SqlConnection conn = new SqlConnection(connString))
+            var views = new List<ViewSchema>();
+            using (var conn = new SqlConnection(connString))
             {
                 conn.Open();
 
-                SqlCommand cmd = new SqlCommand(@"SELECT TABLE_NAME, VIEW_DEFINITION  from INFORMATION_SCHEMA.VIEWS", conn);
-                using (SqlDataReader reader = cmd.ExecuteReader())
+                var cmd = new SqlCommand(@"SELECT TABLE_NAME, VIEW_DEFINITION  from INFORMATION_SCHEMA.VIEWS", conn);
+                using (var reader = cmd.ExecuteReader())
                 {
-                    int count = 0;
+                    var count = 0;
                     while (reader.Read())
                     {
-                        ViewSchema vs = new ViewSchema();
+                        var vs = new ViewSchema();
 
                         if (reader["TABLE_NAME"] == DBNull.Value)
                             continue;
                         if (reader["VIEW_DEFINITION"] == DBNull.Value)
                             continue;
-                        vs.ViewName = (string)reader["TABLE_NAME"];
-                        vs.ViewSQL = (string)reader["VIEW_DEFINITION"];
+                        vs.ViewName = (string) reader["TABLE_NAME"];
+                        vs.ViewSQL = (string) reader["VIEW_DEFINITION"];
 
                         // Remove all ".dbo" strings from the view definition
                         vs.ViewSQL = removedbo.Replace(vs.ViewSQL, string.Empty);
@@ -878,17 +982,18 @@ namespace DbAccess
 
                         count++;
                         CheckCancelled();
-                        handler(false, true, 50 + (int)(count * 50.0 / views.Count), "Parsed view " + vs.ViewName);
+                        handler(false, true, 50 + (int) (count * 50.0 / views.Count), $"Parsed view {vs.ViewName}");
 
-                        _log.Debug("parsed view schema for [" + vs.ViewName + "]");
-                    } // while
-                } // using
+                        _log.Debug($"parsed view schema for [{vs.ViewName}]");
+                    }
+ // while
+                }
+ // using
 
-            } // using
+            }
+ // using
 
-            DatabaseSchema ds = new DatabaseSchema();
-            ds.Tables = tables;
-            ds.Views = views;
+            var ds = new DatabaseSchema {Tables = tables, Views = views};
             return ds;
         }
 
@@ -910,164 +1015,191 @@ namespace DbAccess
         /// <returns>A table schema object that represents our knowledge of the table schema</returns>
         private static TableSchema CreateTableSchema(SqlConnection conn, string tableName, string tschma)
         {
-            TableSchema res = new TableSchema();
-            res.TableName = tableName;
-            res.TableSchemaName = tschma;
-            res.Columns = new List<ColumnSchema>();
-            SqlCommand cmd = new SqlCommand(@"SELECT COLUMN_NAME,COLUMN_DEFAULT,IS_NULLABLE,DATA_TYPE, " +
-                @" (columnproperty(object_id(TABLE_NAME), COLUMN_NAME, 'IsIdentity')) AS [IDENT], " +
-                @"CHARACTER_MAXIMUM_LENGTH AS CSIZE " +
-                "FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '" + tableName + "' ORDER BY " +
-                "ORDINAL_POSITION ASC", conn);
-            using (SqlDataReader reader = cmd.ExecuteReader())
+            var res = new TableSchema
+                          {
+                              TableName = tableName, TableSchemaName = tschma, Columns = new List<ColumnSchema>()
+                          };
+            var cmd = new SqlCommand(
+                $@"SELECT COLUMN_NAME,COLUMN_DEFAULT,IS_NULLABLE,DATA_TYPE,  (columnproperty(object_id(TABLE_NAME), COLUMN_NAME, 'IsIdentity')) AS [IDENT], CHARACTER_MAXIMUM_LENGTH AS CSIZE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{tableName}' ORDER BY ORDINAL_POSITION ASC",
+                conn);
+            using (var reader = cmd.ExecuteReader())
             {
                 while (reader.Read())
                 {
-                    object tmp = reader["COLUMN_NAME"];
+                    var tmp = reader["COLUMN_NAME"];
                     if (tmp is DBNull)
                         continue;
-                    string colName = (string)reader["COLUMN_NAME"];
+                    var colName = (string) reader["COLUMN_NAME"];
 
                     tmp = reader["COLUMN_DEFAULT"];
                     string colDefault;
                     if (tmp is DBNull)
                         colDefault = string.Empty;
                     else
-                        colDefault = (string)tmp;
+                        colDefault = (string) tmp;
 
                     tmp = reader["IS_NULLABLE"];
-                    bool isNullable = ((string)tmp == "YES");
-                    string dataType = (string)reader["DATA_TYPE"];
-                    bool isIdentity = false;
+                    var isNullable = ((string) tmp == "YES");
+                    var dataType = (string) reader["DATA_TYPE"];
+                    var isIdentity = false;
                     if (reader["IDENT"] != DBNull.Value)
-                        isIdentity = ((int)reader["IDENT"]) == 1 ? true : false;
-                    int length = reader["CSIZE"] != DBNull.Value ? Convert.ToInt32(reader["CSIZE"]) : 0;
+                        isIdentity = (int) reader["IDENT"] == 1;
+                    var length = reader["CSIZE"] != DBNull.Value ? Convert.ToInt32(reader["CSIZE"]) : 0;
 
                     ValidateDataType(dataType);
 
-                    // Note that not all data type names need to be converted because
-                    // SQLite establishes type affinity by searching certain strings
-                    // in the type name. For example - everything containing the string
-                    // 'int' in its type name will be assigned an INTEGER affinity
-                    if (dataType == "timestamp")
-                        dataType = "blob";
-                    else if (dataType == "datetime" || dataType == "smalldatetime" || dataType == "date" || dataType == "datetime2" || dataType == "time")
-                        dataType = "datetime";
-                    else if (dataType == "decimal")
-                        dataType = "numeric";
-                    else if (dataType == "money" || dataType == "smallmoney")
-                        dataType = "numeric";
-                    else if (dataType == "binary" || dataType == "varbinary" ||
-                        dataType == "image")
-                        dataType = "blob";
-                    else if (dataType == "tinyint")
-                        dataType = "smallint";
-                    else if (dataType == "bigint")
-                        dataType = "integer";
-                    else if (dataType == "sql_variant")
-                        dataType = "blob";
-                    else if (dataType == "xml")
-                        dataType = "varchar";
-                    else if (dataType == "uniqueidentifier")
-                        dataType = "guid";
-                    else if (dataType == "ntext")
-                        dataType = "text";
-                    else if (dataType == "nchar")
-                        dataType = "char";
+                    switch (dataType)
+                    {
+                        // Note that not all data type names need to be converted because
+                        // SQLite establishes type affinity by searching certain strings
+                        // in the type name. For example - everything containing the string
+                        // 'int' in its type name will be assigned an INTEGER affinity
+                        case "timestamp":
+                            dataType = "blob";
+                            break;
+                        case "datetime":
+                        case "smalldatetime":
+                        case "date":
+                        case "datetime2":
+                        case "time":
+                            dataType = "datetime";
+                            break;
+                        case "decimal":
+                        case "money":
+                        case "smallmoney":
+                            dataType = "numeric";
+                            break;
+                        case "binary":
+                        case "varbinary":
+                        case "image":
+                            dataType = "blob";
+                            break;
+                        case "tinyint":
+                            dataType = "smallint";
+                            break;
+                        case "bigint":
+                            dataType = "integer";
+                            break;
+                        case "sql_variant":
+                            dataType = "blob";
+                            break;
+                        case "xml":
+                            dataType = "varchar";
+                            break;
+                        case "uniqueidentifier":
+                            dataType = "guid";
+                            break;
+                        case "ntext":
+                            dataType = "text";
+                            break;
+                        case "nchar":
+                            dataType = "char";
+                            break;
+                    }
 
                     if (dataType == "bit" || dataType == "int")
                     {
-                        if (colDefault == "('False')")
-                            colDefault = "(0)";
-                        else if (colDefault == "('True')")
-                            colDefault = "(1)";
+                        switch (colDefault)
+                        {
+                            case "('False')":
+                                colDefault = "(0)";
+                                break;
+                            case "('True')":
+                                colDefault = "(1)";
+                                break;
+                        }
                     }
 
                     colDefault = FixDefaultValueString(colDefault);
 
-                    ColumnSchema col = new ColumnSchema();
-                    col.ColumnName = colName;
-                    col.ColumnType = dataType;
-                    col.Length = length;
-                    col.IsNullable = isNullable;
-                    col.IsIdentity = isIdentity;
-                    col.DefaultValue = AdjustDefaultValue(colDefault);
+                    var col = new ColumnSchema
+                                  {
+                                      ColumnName = colName,
+                                      ColumnType = dataType,
+                                      Length = length,
+                                      IsNullable = isNullable,
+                                      IsIdentity = isIdentity,
+                                      DefaultValue = AdjustDefaultValue(colDefault)
+                                  };
                     res.Columns.Add(col);
-                } // while
-            } // using
+                }
+ // while
+            }
+ // using
 
             // Find PRIMARY KEY information
-            SqlCommand cmd2 = new SqlCommand(@"EXEC sp_pkeys '" + tableName + "'", conn);
-            using (SqlDataReader reader = cmd2.ExecuteReader())
+            var cmd2 = new SqlCommand($@"EXEC sp_pkeys '{tableName}'", conn);
+            using (var reader = cmd2.ExecuteReader())
             {
                 res.PrimaryKey = new List<string>();
                 while (reader.Read())
                 {
-                    string colName = (string)reader["COLUMN_NAME"];
+                    var colName = (string) reader["COLUMN_NAME"];
                     res.PrimaryKey.Add(colName);
-                } // while
-            } // using
+                }
+ // while
+            }
+ // using
 
             // Find COLLATE information for all columns in the table
-            SqlCommand cmd4 = new SqlCommand(
-                @"EXEC sp_tablecollations '" + tschma + "." + tableName + "'", conn);
-            using (SqlDataReader reader = cmd4.ExecuteReader())
+            var cmd4 = new SqlCommand($@"EXEC sp_tablecollations '{tschma}.{tableName}'", conn);
+            using (var reader = cmd4.ExecuteReader())
             {
                 while (reader.Read())
                 {
                     bool? isCaseSensitive = null;
-                    string colName = (string)reader["name"];
+                    var colName = (string) reader["name"];
                     if (reader["tds_collation"] != DBNull.Value)
                     {
-                        byte[] mask = (byte[])reader["tds_collation"];
+                        var mask = (byte[]) reader["tds_collation"];
                         if ((mask[2] & 0x10) != 0)
                             isCaseSensitive = false;
                         else
                             isCaseSensitive = true;
-                    } // if
+                    }
 
                     if (isCaseSensitive.HasValue)
                     {
                         // Update the corresponding column schema.
-                        foreach (ColumnSchema csc in res.Columns)
+                        foreach (var csc in res.Columns)
                         {
                             if (csc.ColumnName == colName)
                             {
-                                csc.IsCaseSensitivite = isCaseSensitive;
+                                csc.IsCaseSensitive = isCaseSensitive;
                                 break;
                             }
-                        } // foreach
-                    } // if
-                } // while
-            } // using
+                        }
+
+                    }
+                }
+            }
 
             try
             {
                 // Find index information
-                SqlCommand cmd3 = new SqlCommand(
-                    @"exec sp_helpindex '" + tschma + "." + tableName + "'", conn);
-                using (SqlDataReader reader = cmd3.ExecuteReader())
+                var cmd3 = new SqlCommand($@"exec sp_helpindex '{tschma}.{tableName}'", conn);
+                using (var reader = cmd3.ExecuteReader())
                 {
                     res.Indexes = new List<IndexSchema>();
                     while (reader.Read())
                     {
-                        string indexName = (string)reader["index_name"];
-                        string desc = (string)reader["index_description"];
-                        string keys = (string)reader["index_keys"];
+                        var indexName = (string) reader["index_name"];
+                        var desc = (string) reader["index_description"];
+                        var keys = (string) reader["index_keys"];
 
                         // Don't add the index if it is actually a primary key index
                         if (desc.Contains("primary key"))
                             continue;
 
-                        IndexSchema index = BuildIndexSchema(indexName, desc, keys);
+                        var index = BuildIndexSchema(indexName, desc, keys);
                         res.Indexes.Add(index);
-                    } // while
-                } // using
+                    }
+                }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _log.Warn("failed to read index information for table [" + tableName + "]");
-            } // catch
+                _log.Warn($"failed to read index information for table [{tableName}]");
+            }
 
             return res;
         }
@@ -1079,21 +1211,15 @@ namespace DbAccess
         /// <param name="dataType">The datatype to validate.</param>
         private static void ValidateDataType(string dataType)
         {
-            if (dataType == "int" || dataType == "smallint" ||
-                dataType == "bit" || dataType == "float" ||
-                dataType == "real" || dataType == "nvarchar" ||
-                dataType == "varchar" || dataType == "timestamp" ||
-                dataType == "varbinary" || dataType == "image" ||
-                dataType == "text" || dataType == "ntext" ||
-                dataType == "bigint" ||
-                dataType == "char" || dataType == "numeric" ||
-                dataType == "binary" || dataType == "smalldatetime" ||
-                dataType == "smallmoney" || dataType == "money" ||
-                dataType == "tinyint" || dataType == "uniqueidentifier" ||
-                dataType == "xml" || dataType == "sql_variant" || dataType == "datetime2" || dataType == "date" || dataType == "time" ||
-                dataType == "decimal" || dataType == "nchar" || dataType == "datetime")
+            if (dataType == "int" || dataType == "smallint" || dataType == "bit" || dataType == "float"
+                || dataType == "real" || dataType == "nvarchar" || dataType == "varchar" || dataType == "timestamp"
+                || dataType == "varbinary" || dataType == "image" || dataType == "text" || dataType == "ntext"
+                || dataType == "bigint" || dataType == "char" || dataType == "numeric" || dataType == "binary"
+                || dataType == "smalldatetime" || dataType == "smallmoney" || dataType == "money"
+                || dataType == "tinyint" || dataType == "uniqueidentifier" || dataType == "xml"
+                || dataType == "sql_variant" || dataType == "decimal" || dataType == "nchar" || dataType == "datetime")
                 return;
-            throw new ApplicationException("Validation failed for data type [" + dataType + "]");
+            throw new ApplicationException($"Validation failed for data type [{dataType}]");
         }
 
         /// <summary>
@@ -1104,25 +1230,26 @@ namespace DbAccess
         /// <returns>Adjusted DEFAULT value string (for SQLite)</returns>
         private static string FixDefaultValueString(string colDefault)
         {
-            bool replaced = false;
-            string res = colDefault.Trim();
+            var replaced = false;
+            var res = colDefault.Trim();
 
             // Find first/last indexes in which to search
-            int first = -1;
-            int last = -1;
-            for (int i = 0; i < res.Length; i++)
+            var first = -1;
+            var last = -1;
+            for (var i = 0; i < res.Length; i++)
             {
                 if (res[i] == '\'' && first == -1)
                     first = i;
                 if (res[i] == '\'' && first != -1 && i > last)
                     last = i;
-            } // for
+            }
+ // for
 
             if (first != -1 && last > first)
                 return res.Substring(first, last - first + 1);
 
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < res.Length; i++)
+            var sb = new StringBuilder();
+            for (var i = 0; i < res.Length; i++)
             {
                 if (res[i] != '(' && res[i] != ')')
                 {
@@ -1130,8 +1257,9 @@ namespace DbAccess
                     replaced = true;
                 }
             }
+
             if (replaced)
-                return "(" + sb.ToString() + ")";
+                return $"({sb})";
             else
                 return sb.ToString();
         }
@@ -1147,39 +1275,23 @@ namespace DbAccess
         {
             ts.ForeignKeys = new List<ForeignKeySchema>();
 
-            SqlCommand cmd = new SqlCommand(
-                @"SELECT " +
-                @"  ColumnName = CU.COLUMN_NAME, " +
-                @"  ForeignTableName  = PK.TABLE_NAME, " +
-                @"  ForeignColumnName = PT.COLUMN_NAME, " +
-                @"  DeleteRule = C.DELETE_RULE, " +
-                @"  IsNullable = COL.IS_NULLABLE " +
-                @"FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS C " +
-                @"INNER JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS FK ON C.CONSTRAINT_NAME = FK.CONSTRAINT_NAME " +
-                @"INNER JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS PK ON C.UNIQUE_CONSTRAINT_NAME = PK.CONSTRAINT_NAME " +
-                @"INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE CU ON C.CONSTRAINT_NAME = CU.CONSTRAINT_NAME " +
-                @"INNER JOIN " +
-                @"  ( " +
-                @"    SELECT i1.TABLE_NAME, i2.COLUMN_NAME " +
-                @"    FROM  INFORMATION_SCHEMA.TABLE_CONSTRAINTS i1 " +
-                @"    INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE i2 ON i1.CONSTRAINT_NAME = i2.CONSTRAINT_NAME " +
-                @"    WHERE i1.CONSTRAINT_TYPE = 'PRIMARY KEY' " +
-                @"  ) " +
-                @"PT ON PT.TABLE_NAME = PK.TABLE_NAME " +
-                @"INNER JOIN INFORMATION_SCHEMA.COLUMNS AS COL ON CU.COLUMN_NAME = COL.COLUMN_NAME AND FK.TABLE_NAME = COL.TABLE_NAME " +
-                @"WHERE FK.Table_NAME='" + ts.TableName + "'", conn);
+            var cmd = new SqlCommand(
+                $@"SELECT   ColumnName = CU.COLUMN_NAME,   ForeignTableName  = PK.TABLE_NAME,   ForeignColumnName = PT.COLUMN_NAME,   DeleteRule = C.DELETE_RULE,   IsNullable = COL.IS_NULLABLE FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS C INNER JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS FK ON C.CONSTRAINT_NAME = FK.CONSTRAINT_NAME INNER JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS PK ON C.UNIQUE_CONSTRAINT_NAME = PK.CONSTRAINT_NAME INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE CU ON C.CONSTRAINT_NAME = CU.CONSTRAINT_NAME INNER JOIN   (     SELECT i1.TABLE_NAME, i2.COLUMN_NAME     FROM  INFORMATION_SCHEMA.TABLE_CONSTRAINTS i1     INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE i2 ON i1.CONSTRAINT_NAME = i2.CONSTRAINT_NAME     WHERE i1.CONSTRAINT_TYPE = 'PRIMARY KEY'   ) PT ON PT.TABLE_NAME = PK.TABLE_NAME INNER JOIN INFORMATION_SCHEMA.COLUMNS AS COL ON CU.COLUMN_NAME = COL.COLUMN_NAME AND FK.TABLE_NAME = COL.TABLE_NAME WHERE FK.Table_NAME='{ts.TableName}'",
+                conn);
 
-            using (SqlDataReader reader = cmd.ExecuteReader())
+            using (var reader = cmd.ExecuteReader())
             {
                 while (reader.Read())
                 {
-                    ForeignKeySchema fkc = new ForeignKeySchema();
-                    fkc.ColumnName = (string)reader["ColumnName"];
-                    fkc.ForeignTableName = (string)reader["ForeignTableName"];
-                    fkc.ForeignColumnName = (string)reader["ForeignColumnName"];
-                    fkc.CascadeOnDelete = (string)reader["DeleteRule"] == "CASCADE";
-                    fkc.IsNullable = (string)reader["IsNullable"] == "YES";
-                    fkc.TableName = ts.TableName;
+                    var fkc = new ForeignKeySchema
+                                  {
+                                      ColumnName = (string) reader["ColumnName"],
+                                      ForeignTableName = (string) reader["ForeignTableName"],
+                                      ForeignColumnName = (string) reader["ForeignColumnName"],
+                                      CascadeOnDelete = (string) reader["DeleteRule"] == "CASCADE",
+                                      IsNullable = (string) reader["IsNullable"] == "YES",
+                                      TableName = ts.TableName
+                                  };
                     ts.ForeignKeys.Add(fkc);
                 }
             }
@@ -1194,42 +1306,39 @@ namespace DbAccess
         /// <returns>An index schema object that represents our knowledge of the index</returns>
         private static IndexSchema BuildIndexSchema(string indexName, string desc, string keys)
         {
-            IndexSchema res = new IndexSchema();
-            res.IndexName = indexName;
+            var res = new IndexSchema {IndexName = indexName};
 
             // Determine if this is a unique index or not.
-            string[] descParts = desc.Split(',');
-            foreach (string p in descParts)
+            var descParts = desc.Split(',');
+            foreach (var p in descParts)
             {
-                if (p.Trim().Contains("unique"))
+                if (!p.Trim().Contains("unique"))
                 {
-                    res.IsUnique = true;
-                    break;
+                    continue;
                 }
-            } // foreach
+                res.IsUnique = true;
+                break;
+            }
 
             // Get all key names and check if they are ASCENDING or DESCENDING
             res.Columns = new List<IndexColumn>();
-            string[] keysParts = keys.Split(',');
-            foreach (string p in keysParts)
+            var keysParts = keys.Split(',');
+            foreach (var p in keysParts)
             {
-                Match m = _keyRx.Match(p.Trim());
+                var m = _keyRx.Match(p.Trim());
                 if (!m.Success)
                 {
-                    throw new ApplicationException("Illegal key name [" + p + "] in index [" +
-                        indexName + "]");
+                    throw new ApplicationException($"Illegal key name [{p}] in index [{indexName}]");
                 }
 
-                string key = m.Groups[1].Value;
-                IndexColumn ic = new IndexColumn();
-                ic.ColumnName = key;
-                if (m.Groups[2].Success)
-                    ic.IsAscending = false;
-                else
-                    ic.IsAscending = true;
+                var key = m.Groups[1].Value;
+                var ic = new IndexColumn
+                             {
+                                 ColumnName = key, IsAscending = !m.Groups[2].Success
+                             };
 
                 res.Columns.Add(ic);
-            } // foreach
+            }
 
             return res;
         }
@@ -1241,13 +1350,13 @@ namespace DbAccess
         /// <returns>Adjusted DEFAULT value string</returns>
         private static string AdjustDefaultValue(string val)
         {
-            if (val == null || val == string.Empty)
+            if (string.IsNullOrEmpty(val))
+            {
                 return val;
+            }
 
-            Match m = _defaultValueRx.Match(val);
-            if (m.Success)
-                return m.Groups[1].Value;
-            return val;
+            var m = _defaultValueRx.Match(val);
+            return m.Success ? m.Groups[1].Value : val;
         }
 
         /// <summary>
@@ -1257,29 +1366,39 @@ namespace DbAccess
         /// <returns>SQLite connection string</returns>
         private static string CreateSQLiteConnectionString(string sqlitePath, string password)
         {
-            SQLiteConnectionStringBuilder builder = new SQLiteConnectionStringBuilder();
-            builder.DataSource = sqlitePath;
+            var builder = new SQLiteConnectionStringBuilder
+                              {
+                                  DataSource = sqlitePath
+                              };
             if (password != null)
+            {
                 builder.Password = password;
+            }
+
             builder.PageSize = 4096;
             builder.UseUTF16Encoding = true;
-            string connstring = builder.ConnectionString;
+            var connstring = builder.ConnectionString;
 
             return connstring;
         }
+
         #endregion
 
         #region Trigger related
-        private static void AddTriggersForForeignKeys(string sqlitePath, IEnumerable<TableSchema> schema,
-            string password, SqlConversionHandler handler)
+
+        private static void AddTriggersForForeignKeys(
+            string sqlitePath,
+            IEnumerable<TableSchema> schema,
+            string password)
         {
             // Connect to the newly created database
-            string sqliteConnString = CreateSQLiteConnectionString(sqlitePath, password);
-            using (SQLiteConnection conn = new SQLiteConnection(sqliteConnString))
+            var sqliteConnString = CreateSQLiteConnectionString(sqlitePath, password);
+            using (var conn = new SQLiteConnection(sqliteConnString))
             {
                 conn.Open();
+
                 // foreach
-                foreach (TableSchema dt in schema)
+                foreach (var dt in schema)
                 {
                     try
                     {
@@ -1291,21 +1410,21 @@ namespace DbAccess
                         throw;
                     }
                 }
-
-            } // using
+            }
 
             _log.Debug("finished adding triggers to schema");
         }
 
         private static void AddTableTriggers(SQLiteConnection conn, TableSchema dt)
         {
-            IList<TriggerSchema> triggers = TriggerBuilder.GetForeignKeyTriggers(dt);
-            foreach (TriggerSchema trigger in triggers)
+            var triggers = TriggerBuilder.GetForeignKeyTriggers(dt);
+            foreach (var trigger in triggers)
             {
-                SQLiteCommand cmd = new SQLiteCommand(WriteTriggerSchema(trigger), conn);
+                var cmd = new SQLiteCommand(WriteTriggerSchema(trigger), conn);
                 cmd.ExecuteNonQuery();
             }
         }
+
         #endregion
 
         /// <summary>
@@ -1315,18 +1434,19 @@ namespace DbAccess
         /// <returns>Executable script</returns>
         public static string WriteTriggerSchema(TriggerSchema ts)
         {
-            return @"CREATE TRIGGER [" + ts.Name + "] " +
-                   ts.Type + " " + ts.Event +
-                   " ON [" + ts.Table + "] " +
-                   "BEGIN " + ts.Body + " END;";
+            return $@"CREATE TRIGGER [{ts.Name}] {ts.Type} {ts.Event} ON [{ts.Table}] BEGIN {ts.Body} END;";
         }
 
         #region Private Variables
-        private static bool _isActive = false;
-        private static bool _cancelled = false;
-        private static Regex _keyRx = new Regex(@"(([a-zA-Z_√§√∂√º√Ñ√ñ√ú√ü0-9\.]|(\s+))+)(\(\-\))?");
-        private static Regex _defaultValueRx = new Regex(@"\(N(\'.*\')\)");
-        private static ILog _log = LogManager.GetLogger(typeof(SqlServerToSQLite));
+
+        private static bool _cancelled;
+
+        private static readonly Regex _keyRx = new Regex(@"(([a-zA-Z_‰ˆ¸ƒ÷‹ﬂ0-9\.]|(\s+))+)(\(\-\))?");
+
+        private static readonly Regex _defaultValueRx = new Regex(@"\(N(\'.*\')\)");
+
+        private static readonly ILog _log = LogManager.GetLogger(typeof(SqlServerToSQLite));
+
         #endregion
     }
 

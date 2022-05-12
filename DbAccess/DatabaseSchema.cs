@@ -1,9 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-
 namespace DbAccess
 {
+    using System.Collections.Generic;
+
     /// <summary>
     /// Contains the entire database schema
     /// </summary>

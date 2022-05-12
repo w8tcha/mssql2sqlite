@@ -1,37 +1,29 @@
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Text;
-using System.Windows.Forms;
-using DbAccess;
-
 namespace Converter
 {
+    using System;
+    using System.Windows.Forms;
+
+    using DbAccess;
+
     public partial class ViewFailureDialog : Form
     {
         public ViewFailureDialog()
         {
-            InitializeComponent();
+            this.InitializeComponent();
         }
 
         public ViewSchema View
         {
-            get { return _view; }
+            get => this._view;
             set
             {
-                _view = value;
-                this.Text = "SQL Error: "+_view.ViewName;
-                txtSQL.Text = _view.ViewSQL;
+                this._view = value;
+                this.Text = $@"SQL Error: {this._view.ViewName}";
+                this.txtSQL.Text = this._view.ViewSQL;
             }
         }
 
-        public string ViewSQL
-        {
-            get { return txtSQL.Text; }
-        }
-
+        public string ViewSQL => this.txtSQL.Text;
 
         private void btnOK_Click(object sender, EventArgs e)
         {

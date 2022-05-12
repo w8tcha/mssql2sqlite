@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace DbAccess
+﻿namespace DbAccess
 {
     public enum TriggerEvent
     {
