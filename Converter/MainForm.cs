@@ -153,6 +153,7 @@ namespace Converter
         	} else {
         		sqlConnString = GetSqlServerConnectionString(txtSqlAddress.Text, (string)cboDatabases.SelectedItem, txtUserDB.Text, txtPassDB.Text);
         	}
+            bool createViews = cbxCreateViews.Checked;
         	
             string sqlitePath = txtSQLitePath.Text.Trim();
             this.Cursor = Cursors.WaitCursor;
@@ -233,7 +234,7 @@ namespace Converter
             if (!cbxEncrypt.Checked)
                 password = null;
             SqlServerToSQLite.ConvertSqlServerToSQLiteDatabase(sqlConnString, sqlitePath, password, handler, 
-                selectionHandler, viewFailureHandler, cbxTriggers.Checked);
+                selectionHandler, viewFailureHandler, cbxTriggers.Checked, createViews);
         }
 
         #endregion
@@ -256,6 +257,8 @@ namespace Converter
             cboDatabases.Enabled = cboDatabases.Items.Count > 0 && !SqlServerToSQLite.IsActive;
             txtPassword.Enabled = cbxEncrypt.Checked && cbxEncrypt.Enabled;
             cbxIntegrated.Enabled = !SqlServerToSQLite.IsActive;
+            cbxCreateViews.Enabled = !SqlServerToSQLite.IsActive;
+            cbxTriggers.Enabled = !SqlServerToSQLite.IsActive;
             txtPassDB.Enabled = !SqlServerToSQLite.IsActive;
             txtUserDB.Enabled = !SqlServerToSQLite.IsActive;
         }

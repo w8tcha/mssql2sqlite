@@ -49,6 +49,7 @@ namespace Converter
             this.lblUser = new System.Windows.Forms.Label();
             this.lblPassword = new System.Windows.Forms.Label();
             this.cbxTriggers = new System.Windows.Forms.CheckBox();
+            this.cbxCreateViews = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // label1
@@ -64,7 +65,7 @@ namespace Converter
             // 
             this.txtSqlAddress.Location = new System.Drawing.Point(154, 17);
             this.txtSqlAddress.Name = "txtSqlAddress";
-            this.txtSqlAddress.Size = new System.Drawing.Size(313, 20);
+            this.txtSqlAddress.Size = new System.Drawing.Size(429, 20);
             this.txtSqlAddress.TabIndex = 1;
             this.txtSqlAddress.TextChanged += new System.EventHandler(this.txtSqlAddress_TextChanged);
             // 
@@ -81,13 +82,13 @@ namespace Converter
             // 
             this.txtSQLitePath.Location = new System.Drawing.Point(154, 98);
             this.txtSQLitePath.Name = "txtSQLitePath";
-            this.txtSQLitePath.Size = new System.Drawing.Size(313, 20);
+            this.txtSQLitePath.Size = new System.Drawing.Size(429, 20);
             this.txtSQLitePath.TabIndex = 11;
             this.txtSQLitePath.TextChanged += new System.EventHandler(this.txtSQLitePath_TextChanged);
             // 
             // btnBrowseSQLitePath
             // 
-            this.btnBrowseSQLitePath.Location = new System.Drawing.Point(472, 97);
+            this.btnBrowseSQLitePath.Location = new System.Drawing.Point(589, 96);
             this.btnBrowseSQLitePath.Name = "btnBrowseSQLitePath";
             this.btnBrowseSQLitePath.Size = new System.Drawing.Size(75, 23);
             this.btnBrowseSQLitePath.TabIndex = 12;
@@ -98,7 +99,7 @@ namespace Converter
             // btnStart
             // 
             this.btnStart.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnStart.Location = new System.Drawing.Point(171, 216);
+            this.btnStart.Location = new System.Drawing.Point(365, 216);
             this.btnStart.Name = "btnStart";
             this.btnStart.Size = new System.Drawing.Size(198, 23);
             this.btnStart.TabIndex = 17;
@@ -128,13 +129,13 @@ namespace Converter
             this.cboDatabases.FormattingEnabled = true;
             this.cboDatabases.Location = new System.Drawing.Point(154, 43);
             this.cboDatabases.Name = "cboDatabases";
-            this.cboDatabases.Size = new System.Drawing.Size(135, 21);
+            this.cboDatabases.Size = new System.Drawing.Size(429, 21);
             this.cboDatabases.TabIndex = 4;
             this.cboDatabases.SelectedIndexChanged += new System.EventHandler(this.cboDatabases_SelectedIndexChanged);
             // 
             // btnSet
             // 
-            this.btnSet.Location = new System.Drawing.Point(472, 16);
+            this.btnSet.Location = new System.Drawing.Point(589, 15);
             this.btnSet.Name = "btnSet";
             this.btnSet.Size = new System.Drawing.Size(75, 23);
             this.btnSet.TabIndex = 2;
@@ -147,7 +148,7 @@ namespace Converter
             this.pbrProgress.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.pbrProgress.Location = new System.Drawing.Point(12, 195);
             this.pbrProgress.Name = "pbrProgress";
-            this.pbrProgress.Size = new System.Drawing.Size(529, 18);
+            this.pbrProgress.Size = new System.Drawing.Size(652, 18);
             this.pbrProgress.TabIndex = 16;
             // 
             // lblMessage
@@ -162,7 +163,7 @@ namespace Converter
             // btnCancel
             // 
             this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnCancel.Location = new System.Drawing.Point(446, 216);
+            this.btnCancel.Location = new System.Drawing.Point(569, 216);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(95, 23);
             this.btnCancel.TabIndex = 18;
@@ -186,7 +187,7 @@ namespace Converter
             this.txtPassword.Location = new System.Drawing.Point(154, 125);
             this.txtPassword.Name = "txtPassword";
             this.txtPassword.PasswordChar = '*';
-            this.txtPassword.Size = new System.Drawing.Size(121, 20);
+            this.txtPassword.Size = new System.Drawing.Size(197, 20);
             this.txtPassword.TabIndex = 14;
             this.txtPassword.TextChanged += new System.EventHandler(this.txtPassword_TextChanged);
             // 
@@ -249,11 +250,22 @@ namespace Converter
             this.cbxTriggers.Text = "Create triggers enforcing foreign keys";
             this.cbxTriggers.UseVisualStyleBackColor = true;
             // 
+            // cbxCreateViews
+            // 
+            this.cbxCreateViews.AutoSize = true;
+            this.cbxCreateViews.Location = new System.Drawing.Point(222, 151);
+            this.cbxCreateViews.Name = "cbxCreateViews";
+            this.cbxCreateViews.Size = new System.Drawing.Size(249, 17);
+            this.cbxCreateViews.TabIndex = 20;
+            this.cbxCreateViews.Text = "Try to create views (works only in simple cases)";
+            this.cbxCreateViews.UseVisualStyleBackColor = true;
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(555, 242);
+            this.ClientSize = new System.Drawing.Size(676, 242);
+            this.Controls.Add(this.cbxCreateViews);
             this.Controls.Add(this.cbxTriggers);
             this.Controls.Add(this.txtPassDB);
             this.Controls.Add(this.txtUserDB);
@@ -308,6 +320,7 @@ namespace Converter
         private System.Windows.Forms.CheckBox cbxEncrypt;
         private System.Windows.Forms.TextBox txtPassword;
         private System.Windows.Forms.CheckBox cbxTriggers;
+        private System.Windows.Forms.CheckBox cbxCreateViews;
     }
 }
 
