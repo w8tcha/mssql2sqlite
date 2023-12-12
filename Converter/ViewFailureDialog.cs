@@ -23,7 +23,7 @@ namespace Converter
             }
         }
 
-        public string ViewSQL => this.txtSQL.Text;
+        public string ViewSql => this.txtSQL.Text;
 
         private void btnOK_Click(object sender, EventArgs e)
         {

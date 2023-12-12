@@ -5,7 +5,7 @@ namespace Converter
     using System.Data.SqlClient;
     using System.Reflection;
     using System.Windows.Forms;
-
+    
     using DbAccess;
 
     public partial class MainForm : Form
@@ -245,7 +245,7 @@ namespace Converter
                                         var dlg = new ViewFailureDialog();
                                         dlg.View = vs;
                                         var res = dlg.ShowDialog(this);
-                                        updated = res == DialogResult.OK ? dlg.ViewSQL : null;
+                                        updated = res == DialogResult.OK ? dlg.ViewSql : null;
                                     }));
 
                         return updated;

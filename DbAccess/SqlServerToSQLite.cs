@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace DbAccess
 {
     using System;
@@ -9,7 +11,7 @@ namespace DbAccess
     using System.Text;
     using System.Text.RegularExpressions;
     using System.Threading;
-
+    
     using log4net;
 
     /// <summary>
@@ -127,7 +129,6 @@ namespace DbAccess
             {
                 AddTriggersForForeignKeys(sqlitePath, ds.Tables, password);
             }
-
         }
 
         /// <summary>
@@ -141,7 +142,7 @@ namespace DbAccess
         private static void CopySqlServerRowsToSQLiteDB(
             string sqlConnString,
             string sqlitePath,
-            List<TableSchema> schema,
+            IReadOnlyList<TableSchema> schema,
             string password,
             SqlConversionHandler handler)
         {
@@ -366,7 +367,6 @@ namespace DbAccess
             {
                 return Guid.Empty;
             }
- // catch
         }
 
         /// <summary>
@@ -386,7 +386,6 @@ namespace DbAccess
                 if (i < ts.Columns.Count - 1)
                     sb.Append(", ");
             }
- // for
 
             sb.Append(") VALUES (");
 
@@ -421,23 +420,28 @@ namespace DbAccess
         /// <param name="str">The name to change if necessary</param>
         /// <param name="names">Used to avoid duplicate names</param>
         /// <returns>A normalized name</returns>
-        private static string GetNormalizedName(string str, List<string> names)
+        private static string GetNormalizedName(string str, ICollection<string> names)
         {
-            var sb = new StringBuilder();
-            for (var i = 0; i < str.Length; i++)
+            while (true)
             {
-                if (char.IsLetterOrDigit(str[i]) || str[i] == '_')
-                    sb.Append(str[i]);
-                else
-                    sb.Append("_");
-            }
- // for
+                var sb = new StringBuilder();
+                foreach (var t in str)
+                {
+                    if (char.IsLetterOrDigit(t) || t == '_')
+                        sb.Append(t);
+                    else
+                        sb.Append("_");
+                }
 
-            // Avoid returning duplicate name
-            if (names.Contains(sb.ToString()))
-                return GetNormalizedName($"{sb}_", names);
-            else
+                // Avoid returning duplicate name
+                if (names.Contains(sb.ToString()))
+                {
+                    str = $"{sb}_";
+                    continue;
+                }
+
                 return sb.ToString();
+            }
         }
 
         /// <summary>
@@ -630,18 +634,17 @@ namespace DbAccess
                     var sql = handler(updated);
 
                     if (sql == null)
-                        return; // Discard the view
-                    else
                     {
-                        // Try to re-create the view with the user-supplied view definition SQL
-                        updated.ViewSQL = sql;
-                        AddSQLiteView(conn, updated, handler);
+                        return; // Discard the view
                     }
+
+                    // Try to re-create the view with the user-supplied view definition SQL
+                    updated.ViewSQL = sql;
+                    AddSQLiteView(conn, updated, handler);
                 }
                 else
                     throw;
             }
- // catch
         }
 
         /// <summary>
@@ -713,17 +716,13 @@ namespace DbAccess
                 for (var i = 0; i < ts.ForeignKeys.Count; i++)
                 {
                     var foreignKey = ts.ForeignKeys[i];
-                    var stmt = string.Format(
-                        "    FOREIGN KEY ([{0}])\n        REFERENCES [{1}]([{2}])",
-                        foreignKey.ColumnName,
-                        foreignKey.ForeignTableName,
-                        foreignKey.ForeignColumnName);
+                    var stmt =
+                        $"    FOREIGN KEY ([{foreignKey.ColumnName}])\n        REFERENCES [{foreignKey.ForeignTableName}]([{foreignKey.ForeignColumnName}])";
 
                     sb.Append(stmt);
                     if (i < ts.ForeignKeys.Count - 1)
                         sb.Append(",\n");
                 }
- // for
             }
 
             sb.Append("\n");
@@ -732,14 +731,12 @@ namespace DbAccess
             // Create any relevant indexes
             if (ts.Indexes != null)
             {
-                for (var i = 0; i < ts.Indexes.Count; i++)
+                foreach (var t in ts.Indexes)
                 {
-                    var stmt = BuildCreateIndex(ts.TableName, ts.Indexes[i]);
+                    var stmt = BuildCreateIndex(ts.TableName, t);
                     sb.Append($"{stmt};\n");
                 }
- // for
             }
- // if
 
             var query = sb.ToString();
             return query;
@@ -802,12 +799,7 @@ namespace DbAccess
             }
             else
             {
-                if (col.ColumnType == "int")
-                    sb.Append("integer");
-                else
-                {
-                    sb.Append(col.ColumnType);
-                }
+                sb.Append(col.ColumnType == "int" ? "integer" : col.ColumnType);
 
                 if (col.Length > 0)
                     sb.Append($"({col.Length})");
@@ -1152,10 +1144,7 @@ namespace DbAccess
                     if (reader["tds_collation"] != DBNull.Value)
                     {
                         var mask = (byte[]) reader["tds_collation"];
-                        if ((mask[2] & 0x10) != 0)
-                            isCaseSensitive = false;
-                        else
-                            isCaseSensitive = true;
+                        isCaseSensitive = (mask[2] & 0x10) == 0;
                     }
 
                     if (isCaseSensitive.HasValue)
@@ -1253,19 +1242,16 @@ namespace DbAccess
                 return res.Substring(first, last - first + 1);
 
             var sb = new StringBuilder();
-            for (var i = 0; i < res.Length; i++)
+            foreach (var t in res)
             {
-                if (res[i] != '(' && res[i] != ')')
+                if (t != '(' && t != ')')
                 {
-                    sb.Append(res[i]);
+                    sb.Append(t);
                     replaced = true;
                 }
             }
 
-            if (replaced)
-                return $"({sb})";
-            else
-                return sb.ToString();
+            return replaced ? $"({sb})" : sb.ToString();
         }
 
 
@@ -1314,12 +1300,8 @@ namespace DbAccess
 
             // Determine if this is a unique index or not.
             var descParts = desc.Split(',');
-            foreach (var p in descParts)
+            foreach (var p in descParts.Where(p => p.Trim().Contains("unique")))
             {
-                if (!p.Trim().Contains("unique"))
-                {
-                    continue;
-                }
                 res.IsUnique = true;
                 break;
             }
@@ -1422,9 +1404,8 @@ namespace DbAccess
         private static void AddTableTriggers(SQLiteConnection conn, TableSchema dt)
         {
             var triggers = TriggerBuilder.GetForeignKeyTriggers(dt);
-            foreach (var trigger in triggers)
+            foreach (var cmd in triggers.Select(trigger => new SQLiteCommand(WriteTriggerSchema(trigger), conn)))
             {
-                var cmd = new SQLiteCommand(WriteTriggerSchema(trigger), conn);
                 cmd.ExecuteNonQuery();
             }
         }
