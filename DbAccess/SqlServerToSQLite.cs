@@ -1217,8 +1217,12 @@ namespace DbAccess
                 || dataType == "bigint" || dataType == "char" || dataType == "numeric" || dataType == "binary"
                 || dataType == "smalldatetime" || dataType == "smallmoney" || dataType == "money"
                 || dataType == "tinyint" || dataType == "uniqueidentifier" || dataType == "xml"
-                || dataType == "sql_variant" || dataType == "decimal" || dataType == "nchar" || dataType == "datetime")
+                || dataType == "sql_variant" || dataType == "datetime2" || dataType == "date" || dataType == "time"
+                || dataType == "decimal" || dataType == "nchar" || dataType == "datetime")
+            {
                 return;
+            }
+
             throw new ApplicationException($"Validation failed for data type [{dataType}]");
         }
 

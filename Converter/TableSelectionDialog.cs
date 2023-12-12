@@ -14,6 +14,7 @@ namespace Converter
     public partial class TableSelectionDialog : Form
     {
         #region Constructors
+
         public TableSelectionDialog()
         {
             this.InitializeComponent();
@@ -27,7 +28,10 @@ namespace Converter
         /// Returns the list of included table schema objects.
         /// </summary>
         public List<TableSchema> IncludedTables =>
-            (from DataGridViewRow row in this.grdTables.Rows let include = (bool) row.Cells[0].Value where include select (TableSchema)row.Tag).ToList();
+            (from DataGridViewRow row in this.grdTables.Rows
+             let include = (bool)row.Cells[0].Value
+             where include
+             select (TableSchema)row.Tag).ToList();
 
         #endregion
 
@@ -49,6 +53,7 @@ namespace Converter
         #endregion
 
         #region Event Handlers
+
         private void btnOK_Click(object sender, EventArgs e)
         {
             this.DialogResult = DialogResult.OK;
@@ -80,6 +85,7 @@ namespace Converter
         #endregion
 
         #region Private Methods
+
         private void UpdateGuiFromSchema(List<TableSchema> schema)
         {
             this.grdTables.Rows.Clear();
