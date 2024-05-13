@@ -58,18 +58,16 @@ namespace Converter
 
                     // Get the names of all DBs in the database server.
                     var query = new SqlCommand(@"select distinct [name] from sysdatabases", conn);
-                    using (var reader = query.ExecuteReader())
+                    using var reader = query.ExecuteReader();
+                    this.cboDatabases.Items.Clear();
+                    while (reader.Read())
                     {
-                        this.cboDatabases.Items.Clear();
-                        while (reader.Read())
-                        {
-                            this.cboDatabases.Items.Add((string) reader[0]);
-                        }
+                        this.cboDatabases.Items.Add((string)reader[0]);
+                    }
 
-                        if (this.cboDatabases.Items.Count > 0)
-                        {
-                            this.cboDatabases.SelectedIndex = 0;
-                        }
+                    if (this.cboDatabases.Items.Count > 0)
+                    {
+                        this.cboDatabases.SelectedIndex = 0;
                     }
                 }
 
@@ -167,7 +165,7 @@ namespace Converter
                 delegate(bool done, bool success, int percent, string msg)
                     {
                         this.Invoke(
-                            new MethodInvoker(
+                            new System.Windows.Forms.MethodInvoker(
                                 delegate()
                                     {
                                         this.UpdateSensitivity();
@@ -219,7 +217,7 @@ namespace Converter
                     {
                         List<TableSchema> updated = null;
                         this.Invoke(
-                            new MethodInvoker(
+                            new System.Windows.Forms.MethodInvoker(
                                 delegate
                                     {
                                         // Allow the user to select which tables to include by showing him the 
@@ -239,7 +237,7 @@ namespace Converter
                     {
                         string updated = null;
                         this.Invoke(
-                            new MethodInvoker(
+                            new System.Windows.Forms.MethodInvoker(
                                 delegate
                                     {
                                         var dlg = new ViewFailureDialog
@@ -280,7 +278,7 @@ namespace Converter
                                                           && (!this.cbxEncrypt.Checked
                                                               || this.txtPassword.Text.Trim().Length > 0))
             {
-                this.btnStart.Enabled = true && !SqlServerToSQLite.IsActive;
+                this.btnStart.Enabled = !SqlServerToSQLite.IsActive;
             }
             else
             {
