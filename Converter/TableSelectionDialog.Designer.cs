@@ -87,7 +87,7 @@ namespace Converter
             this.btnSelectAll.TabIndex = 1;
             this.btnSelectAll.Text = "Select All";
             this.btnSelectAll.UseVisualStyleBackColor = true;
-            this.btnSelectAll.Click += new System.EventHandler(this.btnSelectAll_Click);
+            this.btnSelectAll.Click += new System.EventHandler(this.SelectAll_Click);
 
             // btnDeselectAll
             this.btnDeselectAll.Anchor =
@@ -99,7 +99,7 @@ namespace Converter
             this.btnDeselectAll.TabIndex = 2;
             this.btnDeselectAll.Text = "Deselect All";
             this.btnDeselectAll.UseVisualStyleBackColor = true;
-            this.btnDeselectAll.Click += new System.EventHandler(this.btnDeselectAll_Click);
+            this.btnDeselectAll.Click += new System.EventHandler(this.DeselectAll_Click);
 
             // btnCancel
             this.btnCancel.Anchor =
@@ -112,7 +112,7 @@ namespace Converter
             this.btnCancel.TabIndex = 3;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
-            this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
+            this.btnCancel.Click += new System.EventHandler(this.Cancel_Click);
 
             // btnOK
             this.btnOK.Anchor =
@@ -124,7 +124,7 @@ namespace Converter
             this.btnOK.TabIndex = 4;
             this.btnOK.Text = "OK";
             this.btnOK.UseVisualStyleBackColor = true;
-            this.btnOK.Click += new System.EventHandler(this.btnOK_Click);
+            this.btnOK.Click += new System.EventHandler(this.OK_Click);
 
             // TableSelectionDialog
             this.AcceptButton = this.btnOK;

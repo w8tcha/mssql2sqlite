@@ -14,13 +14,10 @@
             get
             {
                 var sqlServer = ConfigurationManager.ConnectionStrings["SqlServer"];
-                if (sqlServer == null)
-                {
-                    throw new ConfigurationErrorsException(
-                        "Please add a valid connectionstring with the key SqlServer");
-                }
-
-                return sqlServer.ConnectionString;
+                return sqlServer == null
+                    ? throw new ConfigurationErrorsException(
+                        "Please add a valid connectionstring with the key SqlServer")
+                    : sqlServer.ConnectionString;
             }
         }
 
@@ -51,7 +48,7 @@
 
         public static T GetEnumValue<T>(string enumString, T defaultValue)
         {
-            if (string.IsNullOrEmpty(enumString) || Enum.IsDefined(typeof(T), enumString) == false)
+            if (string.IsNullOrEmpty(enumString) || !Enum.IsDefined(typeof(T), enumString))
             {
                 return defaultValue;
             }

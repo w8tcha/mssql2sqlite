@@ -67,7 +67,7 @@ namespace Converter
             this.txtSqlAddress.Name = "txtSqlAddress";
             this.txtSqlAddress.Size = new System.Drawing.Size(429, 20);
             this.txtSqlAddress.TabIndex = 1;
-            this.txtSqlAddress.TextChanged += new System.EventHandler(this.txtSqlAddress_TextChanged);
+            this.txtSqlAddress.TextChanged += new System.EventHandler(this.SqlAddress_TextChanged);
             // 
             // label2
             // 
@@ -84,7 +84,7 @@ namespace Converter
             this.txtSQLitePath.Name = "txtSQLitePath";
             this.txtSQLitePath.Size = new System.Drawing.Size(429, 20);
             this.txtSQLitePath.TabIndex = 11;
-            this.txtSQLitePath.TextChanged += new System.EventHandler(this.txtSQLitePath_TextChanged);
+            this.txtSQLitePath.TextChanged += new System.EventHandler(this.SQLitePath_TextChanged);
             // 
             // btnBrowseSQLitePath
             // 
@@ -94,7 +94,7 @@ namespace Converter
             this.btnBrowseSQLitePath.TabIndex = 12;
             this.btnBrowseSQLitePath.Text = "Browse...";
             this.btnBrowseSQLitePath.UseVisualStyleBackColor = true;
-            this.btnBrowseSQLitePath.Click += new System.EventHandler(this.btnBrowseSQLitePath_Click);
+            this.btnBrowseSQLitePath.Click += new System.EventHandler(this.BrowseSQLitePath_Click);
             // 
             // btnStart
             // 
@@ -105,7 +105,7 @@ namespace Converter
             this.btnStart.TabIndex = 17;
             this.btnStart.Text = "Start The Conversion Process";
             this.btnStart.UseVisualStyleBackColor = true;
-            this.btnStart.Click += new System.EventHandler(this.btnStart_Click);
+            this.btnStart.Click += new System.EventHandler(this.Start_Click);
             // 
             // saveFileDialog1
             // 
@@ -131,7 +131,7 @@ namespace Converter
             this.cboDatabases.Name = "cboDatabases";
             this.cboDatabases.Size = new System.Drawing.Size(429, 21);
             this.cboDatabases.TabIndex = 4;
-            this.cboDatabases.SelectedIndexChanged += new System.EventHandler(this.cboDatabases_SelectedIndexChanged);
+            this.cboDatabases.SelectedIndexChanged += new System.EventHandler(this.Databases_SelectedIndexChanged);
             // 
             // btnSet
             // 
@@ -141,7 +141,7 @@ namespace Converter
             this.btnSet.TabIndex = 2;
             this.btnSet.Text = "Set";
             this.btnSet.UseVisualStyleBackColor = true;
-            this.btnSet.Click += new System.EventHandler(this.btnSet_Click);
+            this.btnSet.Click += new System.EventHandler(this.Set_Click);
             // 
             // pbrProgress
             // 
@@ -169,7 +169,7 @@ namespace Converter
             this.btnCancel.TabIndex = 18;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
-            this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
+            this.btnCancel.Click += new System.EventHandler(this.Cancel_Click);
             // 
             // cbxEncrypt
             // 
@@ -180,7 +180,7 @@ namespace Converter
             this.cbxEncrypt.TabIndex = 13;
             this.cbxEncrypt.Text = "Encryption password:";
             this.cbxEncrypt.UseVisualStyleBackColor = true;
-            this.cbxEncrypt.CheckedChanged += new System.EventHandler(this.cbxEncrypt_CheckedChanged);
+            this.cbxEncrypt.CheckedChanged += new System.EventHandler(this.Encrypt_CheckedChanged);
             // 
             // txtPassword
             // 
@@ -189,7 +189,7 @@ namespace Converter
             this.txtPassword.PasswordChar = '*';
             this.txtPassword.Size = new System.Drawing.Size(197, 20);
             this.txtPassword.TabIndex = 14;
-            this.txtPassword.TextChanged += new System.EventHandler(this.txtPassword_TextChanged);
+            this.txtPassword.TextChanged += new System.EventHandler(this.Password_TextChanged);
             // 
             // cbxIntegrated
             // 

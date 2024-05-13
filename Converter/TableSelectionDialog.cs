@@ -54,17 +54,17 @@ namespace Converter
 
         #region Event Handlers
 
-        private void btnOK_Click(object sender, EventArgs e)
+        private void OK_Click(object sender, EventArgs e)
         {
             this.DialogResult = DialogResult.OK;
         }
 
-        private void btnCancel_Click(object sender, EventArgs e)
+        private void Cancel_Click(object sender, EventArgs e)
         {
             this.DialogResult = DialogResult.Cancel;
         }
 
-        private void btnDeselectAll_Click(object sender, EventArgs e)
+        private void DeselectAll_Click(object sender, EventArgs e)
         {
             foreach (DataGridViewRow row in this.grdTables.Rows)
             {
@@ -73,7 +73,7 @@ namespace Converter
             }
         }
 
-        private void btnSelectAll_Click(object sender, EventArgs e)
+        private void SelectAll_Click(object sender, EventArgs e)
         {
             foreach (DataGridViewRow row in this.grdTables.Rows)
             {

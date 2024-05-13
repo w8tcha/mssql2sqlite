@@ -11,7 +11,7 @@ namespace DbAccess
     using System.Text;
     using System.Text.RegularExpressions;
     using System.Threading;
-    
+
     using log4net;
 
     /// <summary>
@@ -689,7 +689,7 @@ namespace DbAccess
             }
 
             // add primary keys...
-            if (ts.PrimaryKey != null && ts.PrimaryKey.Count > 0 & !pkey)
+            if (ts.PrimaryKey != null && ts.PrimaryKey.Count > 0 && !pkey)
             {
                 sb.Append(",\n");
                 sb.Append("    PRIMARY KEY (");
@@ -848,12 +848,7 @@ namespace DbAccess
         /// <returns></returns>
         private static bool IsValidDefaultValue(string value)
         {
-            if (IsSingleQuoted(value))
-            {
-                return true;
-            }
-
-            return double.TryParse(value, out _);
+            return IsSingleQuoted(value) || double.TryParse(value, out _);
         }
 
         private static bool IsSingleQuoted(string value)
@@ -936,13 +931,10 @@ namespace DbAccess
             _log.Debug("finished parsing all tables in SQL Server schema");
 
             // Allow the user a chance to select which tables to convert
-            if (selectionHandler != null)
-            {
-                var updated = selectionHandler(tables);
-                if (updated != null)
-                    tables = updated;
-            }
- // if
+            var updated = selectionHandler?.Invoke(tables);
+            if (updated != null)
+                tables = updated;
+            // if
 
             var removedbo = new Regex(@"dbo\.", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 

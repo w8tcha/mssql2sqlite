@@ -21,7 +21,7 @@ namespace Converter
 
         #region Event Handler
 
-        private void btnBrowseSQLitePath_Click(object sender, EventArgs e)
+        private void BrowseSQLitePath_Click(object sender, EventArgs e)
         {
             var res = this.saveFileDialog1.ShowDialog(this);
             if (res == DialogResult.Cancel)
@@ -33,14 +33,14 @@ namespace Converter
             this.lblMessage.Text = string.Empty;
         }
 
-        private void cboDatabases_SelectedIndexChanged(object sender, EventArgs e)
+        private void Databases_SelectedIndexChanged(object sender, EventArgs e)
         {
             this.UpdateSensitivity();
             this.pbrProgress.Value = 0;
             this.lblMessage.Text = string.Empty;
         }
 
-        private void btnSet_Click(object sender, EventArgs e)
+        private void Set_Click(object sender, EventArgs e)
         {
             try
             {
@@ -84,7 +84,7 @@ namespace Converter
             }
         }
 
-        private void txtSQLitePath_TextChanged(object sender, EventArgs e)
+        private void SQLitePath_TextChanged(object sender, EventArgs e)
         {
             this.UpdateSensitivity();
         }
@@ -97,12 +97,12 @@ namespace Converter
             this.Text = $"SQL Server To SQLite DB Converter ({version})";
         }
 
-        private void txtSqlAddress_TextChanged(object sender, EventArgs e)
+        private void SqlAddress_TextChanged(object sender, EventArgs e)
         {
             this.UpdateSensitivity();
         }
 
-        private void btnCancel_Click(object sender, EventArgs e)
+        private void Cancel_Click(object sender, EventArgs e)
         {
             SqlServerToSQLite.CancelConversion();
         }
@@ -119,12 +119,12 @@ namespace Converter
                 e.Cancel = false;
         }
 
-        private void cbxEncrypt_CheckedChanged(object sender, EventArgs e)
+        private void Encrypt_CheckedChanged(object sender, EventArgs e)
         {
             this.UpdateSensitivity();
         }
 
-        private void txtPassword_TextChanged(object sender, EventArgs e)
+        private void Password_TextChanged(object sender, EventArgs e)
         {
             this.UpdateSensitivity();
         }
@@ -147,7 +147,7 @@ namespace Converter
             }
         }
 
-        private void btnStart_Click(object sender, EventArgs e)
+        private void Start_Click(object sender, EventArgs e)
         {
             var sqlConnString = this.cbxIntegrated.Checked
                                     ? GetSqlServerConnectionString(
@@ -242,8 +242,10 @@ namespace Converter
                             new MethodInvoker(
                                 delegate
                                     {
-                                        var dlg = new ViewFailureDialog();
-                                        dlg.View = vs;
+                                        var dlg = new ViewFailureDialog
+                                        {
+                                            View = vs
+                                        };
                                         var res = dlg.ShowDialog(this);
                                         updated = res == DialogResult.OK ? dlg.ViewSql : null;
                                     }));

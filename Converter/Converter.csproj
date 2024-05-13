@@ -73,6 +73,10 @@
     <ProjectReference Include="..\DbAccess\DbAccess.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="log4net" Version="2.0.15" />
+    <PackageReference Include="log4net" Version="2.0.17" />
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="9.25.0.90414">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 </Project>

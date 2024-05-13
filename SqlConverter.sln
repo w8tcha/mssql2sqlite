@@ -8,9 +8,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionItems", "SolutionIt
 		SolutionInfo.cs = SolutionInfo.cs
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Converter", "Converter\Converter.csproj", "{1D389047-977D-4278-8357-AC0AC751B95E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Converter", "Converter\Converter.csproj", "{1D389047-977D-4278-8357-AC0AC751B95E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DbAccess", "DbAccess\DbAccess.csproj", "{23AAF1EF-2EB6-43AD-8103-A687F04A7288}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DbAccess", "DbAccess\DbAccess.csproj", "{23AAF1EF-2EB6-43AD-8103-A687F04A7288}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
