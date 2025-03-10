@@ -11,12 +11,12 @@ namespace DbAccess
         /// Gets or sets the tables.
         /// </summary>
         /// <value>The tables.</value>
-        public List<TableSchema> Tables { get; set; } = new List<TableSchema>();
+        public List<TableSchema> Tables { get; set; } = [];
 
         /// <summary>
         /// Gets or sets the views.
         /// </summary>
         /// <value>The views.</value>
-        public List<ViewSchema> Views { get; set; } = new List<ViewSchema>();
+        public List<ViewSchema> Views { get; set; } = [];
     }
 }

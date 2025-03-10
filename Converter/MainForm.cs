@@ -10,16 +10,10 @@ namespace Converter
 
     public partial class MainForm : Form
     {
-        #region Constructor
-
         public MainForm()
         {
             this.InitializeComponent();
         }
-
-        #endregion
-
-        #region Event Handler
 
         private void BrowseSQLitePath_Click(object sender, EventArgs e)
         {
@@ -268,10 +262,6 @@ namespace Converter
                 createViews);
         }
 
-        #endregion
-
-        #region Private Methods
-
         private void UpdateSensitivity()
         {
             if (this.txtSQLitePath.Text.Trim().Length > 0 && this.cboDatabases.Enabled
@@ -313,12 +303,6 @@ namespace Converter
             return res;
         }
 
-        #endregion
-
-        #region Private Variables
-
         private bool _shouldExit;
-
-        #endregion
     }
 }

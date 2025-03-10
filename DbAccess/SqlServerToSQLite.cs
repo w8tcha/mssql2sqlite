@@ -21,17 +21,11 @@ namespace DbAccess
     /// <remarks>The class knows how to convert table and index structures only.</remarks>
     public class SqlServerToSQLite
     {
-        #region Public Properties
-
         /// <summary>
         /// Gets a value indicating whether this instance is active.
         /// </summary>
         /// <value><c>true</c> if this instance is active; otherwise, <c>false</c>.</value>
         public static bool IsActive { get; private set; }
-
-        #endregion
-
-        #region Public Methods
 
         /// <summary>
         /// Cancels the conversion.
@@ -85,10 +79,6 @@ namespace DbAccess
                 });
             ThreadPool.QueueUserWorkItem(wc);
         }
-
-        #endregion
-
-        #region Private Methods
 
         /// <summary>
         /// Do the entire process of first reading the SQL Server schema, creating a corresponding
@@ -151,82 +141,78 @@ namespace DbAccess
             _log.Debug("preparing to insert tables ...");
 
             // Connect to the SQL Server database
-            using (var ssconn = new SqlConnection(sqlConnString))
+            using var ssconn = new SqlConnection(sqlConnString);
+            ssconn.Open();
+
+            // Connect to the SQLite database next
+            var sqliteConnString = CreateSQLiteConnectionString(sqlitePath, password);
+            using var sqconn = new SQLiteConnection(sqliteConnString);
+            sqconn.Open();
+
+            // Go over all tables in the schema and copy their rows
+            for (var i = 0; i < schema.Count; i++)
             {
-                ssconn.Open();
-
-                // Connect to the SQLite database next
-                var sqliteConnString = CreateSQLiteConnectionString(sqlitePath, password);
-                using (var sqconn = new SQLiteConnection(sqliteConnString))
+                var tx = sqconn.BeginTransaction();
+                try
                 {
-                    sqconn.Open();
-
-                    // Go over all tables in the schema and copy their rows
-                    for (var i = 0; i < schema.Count; i++)
+                    var tableQuery = BuildSqlServerTableQuery(schema[i]);
+                    var query = new SqlCommand(tableQuery, ssconn);
+                    using (var reader = query.ExecuteReader())
                     {
-                        var tx = sqconn.BeginTransaction();
-                        try
+                        var insert = BuildSQLiteInsert(schema[i]);
+                        var counter = 0;
+                        while (reader.Read())
                         {
-                            var tableQuery = BuildSqlServerTableQuery(schema[i]);
-                            var query = new SqlCommand(tableQuery, ssconn);
-                            using (var reader = query.ExecuteReader())
+                            insert.Connection = sqconn;
+                            insert.Transaction = tx;
+                            var pnames = new List<string>();
+                            for (var j = 0; j < schema[i].Columns.Count; j++)
                             {
-                                var insert = BuildSQLiteInsert(schema[i]);
-                                var counter = 0;
-                                while (reader.Read())
-                                {
-                                    insert.Connection = sqconn;
-                                    insert.Transaction = tx;
-                                    var pnames = new List<string>();
-                                    for (var j = 0; j < schema[i].Columns.Count; j++)
-                                    {
-                                        var pname = $"@{GetNormalizedName(schema[i].Columns[j].ColumnName, pnames)}";
-                                        insert.Parameters[pname].Value = CastValueForColumn(
-                                            reader[j],
-                                            schema[i].Columns[j]);
-                                        pnames.Add(pname);
-                                    }
-
-                                    insert.ExecuteNonQuery();
-                                    counter++;
-                                    if (counter % 1000 != 0)
-                                    {
-                                        continue;
-                                    }
-                                    CheckCancelled();
-                                    tx.Commit();
-                                    handler(
-                                        false,
-                                        true,
-                                        (int)(100.0 * i / schema.Count),
-                                        $"Added {counter} rows to table {schema[i].TableName} so far");
-                                    tx = sqconn.BeginTransaction();
-                                }
+                                var pname = $"@{GetNormalizedName(schema[i].Columns[j].ColumnName, pnames)}";
+                                insert.Parameters[pname].Value = CastValueForColumn(
+                                    reader[j],
+                                    schema[i].Columns[j]);
+                                pnames.Add(pname);
                             }
 
+                            insert.ExecuteNonQuery();
+                            counter++;
+                            if (counter % 1000 != 0)
+                            {
+                                continue;
+                            }
                             CheckCancelled();
                             tx.Commit();
-
                             handler(
                                 false,
                                 true,
                                 (int)(100.0 * i / schema.Count),
-                                $"Finished inserting rows for table {schema[i].TableName}");
-                            _log.Debug($"finished inserting all rows for table [{schema[i].TableName}]");
-                        }
-                        catch (Exception ex)
-                        {
-                            _log.Error("unexpected exception", ex);
-                            tx.Rollback();
-                            throw;
+                                $"Added {counter} rows to table {schema[i].TableName} so far");
+                            tx = sqconn.BeginTransaction();
                         }
                     }
+
+                    CheckCancelled();
+                    tx.Commit();
+
+                    handler(
+                        false,
+                        true,
+                        (int)(100.0 * i / schema.Count),
+                        $"Finished inserting rows for table {schema[i].TableName}");
+                    _log.Debug($"finished inserting all rows for table [{schema[i].TableName}]");
+                }
+                catch (Exception ex)
+                {
+                    _log.Error("unexpected exception", ex);
+                    tx.Rollback();
+                    throw;
                 }
             }
         }
 
         /// <summary>
-        /// Used in order to adjust the value received from SQL Servr for the SQLite database.
+        /// Used in order to adjust the value received from SQL Server for the SQLite database.
         /// </summary>
         /// <param name="val">The value object</param>
         /// <param name="columnSchema">The corresponding column schema</param>
@@ -406,7 +392,7 @@ namespace DbAccess
             }
  // for
 
-            sb.Append(")");
+            sb.Append(')');
             res.CommandText = sb.ToString();
             res.CommandType = CommandType.Text;
             return res;
@@ -420,7 +406,7 @@ namespace DbAccess
         /// <param name="str">The name to change if necessary</param>
         /// <param name="names">Used to avoid duplicate names</param>
         /// <returns>A normalized name</returns>
-        private static string GetNormalizedName(string str, ICollection<string> names)
+        private static string GetNormalizedName(string str, List<string> names)
         {
             while (true)
             {
@@ -430,7 +416,7 @@ namespace DbAccess
                     if (char.IsLetterOrDigit(t) || t == '_')
                         sb.Append(t);
                     else
-                        sb.Append("_");
+                        sb.Append('_');
                 }
 
                 // Avoid returning duplicate name
@@ -706,7 +692,7 @@ namespace DbAccess
             }
             else
             {
-                sb.Append("\n");
+                sb.Append('\n');
             }
 
             // add foreign keys...
@@ -725,7 +711,7 @@ namespace DbAccess
                 }
             }
 
-            sb.Append("\n");
+            sb.Append('\n');
             sb.Append(");\n");
 
             // Create any relevant indexes
@@ -756,7 +742,7 @@ namespace DbAccess
                 sb.Append("UNIQUE ");
             sb.Append($"INDEX [{tableName}_{indexSchema.IndexName}]\n");
             sb.Append($"ON [{tableName}]\n");
-            sb.Append("(");
+            sb.Append('(');
             for (var i = 0; i < indexSchema.Columns.Count; i++)
             {
                 sb.Append($"[{indexSchema.Columns[i].ColumnName}]");
@@ -767,7 +753,7 @@ namespace DbAccess
             }
  // for
 
-            sb.Append(")");
+            sb.Append(')');
 
             return sb.ToString();
         }
@@ -835,10 +821,7 @@ namespace DbAccess
         {
             var rx = new Regex(@"N\'([^\']*)\'");
             var m = rx.Match(value);
-            if (m.Success)
-                return m.Groups[1].Value;
-            else
-                return value;
+            return m.Success ? m.Groups[1].Value : value;
         }
 
         /// <summary>
@@ -854,7 +837,7 @@ namespace DbAccess
         private static bool IsSingleQuoted(string value)
         {
             value = value.Trim();
-            return value.StartsWith("'") && value.EndsWith("'");
+            return value.StartsWith('\'') && value.EndsWith('\'');
         }
 
         /// <summary>
@@ -945,34 +928,32 @@ namespace DbAccess
                 conn.Open();
 
                 var cmd = new SqlCommand(@"SELECT TABLE_NAME, VIEW_DEFINITION  from INFORMATION_SCHEMA.VIEWS", conn);
-                using (var reader = cmd.ExecuteReader())
+                using var reader = cmd.ExecuteReader();
+                var count = 0;
+                while (reader.Read())
                 {
-                    var count = 0;
-                    while (reader.Read())
-                    {
-                        var vs = new ViewSchema();
+                    var vs = new ViewSchema();
 
-                        if (reader["TABLE_NAME"] == DBNull.Value)
-                            continue;
-                        if (reader["VIEW_DEFINITION"] == DBNull.Value)
-                            continue;
-                        vs.ViewName = (string) reader["TABLE_NAME"];
-                        vs.ViewSQL = (string) reader["VIEW_DEFINITION"];
+                    if (reader["TABLE_NAME"] == DBNull.Value)
+                        continue;
+                    if (reader["VIEW_DEFINITION"] == DBNull.Value)
+                        continue;
+                    vs.ViewName = (string)reader["TABLE_NAME"];
+                    vs.ViewSQL = (string)reader["VIEW_DEFINITION"];
 
-                        // Remove all ".dbo" strings from the view definition
-                        vs.ViewSQL = removedbo.Replace(vs.ViewSQL, string.Empty);
+                    // Remove all ".dbo" strings from the view definition
+                    vs.ViewSQL = removedbo.Replace(vs.ViewSQL, string.Empty);
 
-                        views.Add(vs);
+                    views.Add(vs);
 
-                        count++;
-                        CheckCancelled();
-                        handler(false, true, 50 + (int) (count * 50.0 / views.Count), $"Parsed view {vs.ViewName}");
+                    count++;
+                    CheckCancelled();
+                    handler(false, true, 50 + (int)(count * 50.0 / views.Count), $"Parsed view {vs.ViewName}");
 
-                        _log.Debug($"parsed view schema for [{vs.ViewName}]");
-                    }
- // while
+                    _log.Debug($"parsed view schema for [{vs.ViewName}]");
                 }
- // using
+                // while
+                // using
 
             }
  // using
@@ -1001,7 +982,7 @@ namespace DbAccess
         {
             var res = new TableSchema
                           {
-                              TableName = tableName, TableSchemaName = tschma, Columns = new List<ColumnSchema>()
+                              TableName = tableName, TableSchemaName = tschma, Columns = []
                           };
             var cmd = new SqlCommand(
                 $@"SELECT COLUMN_NAME,COLUMN_DEFAULT,IS_NULLABLE,DATA_TYPE,  (columnproperty(object_id(TABLE_NAME), COLUMN_NAME, 'IsIdentity')) AS [IDENT], CHARACTER_MAXIMUM_LENGTH AS CSIZE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{tableName}' ORDER BY ORDINAL_POSITION ASC",
@@ -1115,7 +1096,7 @@ namespace DbAccess
             var cmd2 = new SqlCommand($@"EXEC sp_pkeys '{tableName}'", conn);
             using (var reader = cmd2.ExecuteReader())
             {
-                res.PrimaryKey = new List<string>();
+                res.PrimaryKey = [];
                 while (reader.Read())
                 {
                     var colName = (string) reader["COLUMN_NAME"];
@@ -1159,22 +1140,20 @@ namespace DbAccess
             {
                 // Find index information
                 var cmd3 = new SqlCommand($@"exec sp_helpindex '{tschma}.{tableName}'", conn);
-                using (var reader = cmd3.ExecuteReader())
+                using var reader = cmd3.ExecuteReader();
+                res.Indexes = [];
+                while (reader.Read())
                 {
-                    res.Indexes = new List<IndexSchema>();
-                    while (reader.Read())
-                    {
-                        var indexName = (string) reader["index_name"];
-                        var desc = (string) reader["index_description"];
-                        var keys = (string) reader["index_keys"];
+                    var indexName = (string) reader["index_name"];
+                    var desc = (string) reader["index_description"];
+                    var keys = (string) reader["index_keys"];
 
-                        // Don't add the index if it is actually a primary key index
-                        if (desc.Contains("primary key"))
-                            continue;
+                    // Don't add the index if it is actually a primary key index
+                    if (desc.Contains("primary key"))
+                        continue;
 
-                        var index = BuildIndexSchema(indexName, desc, keys);
-                        res.Indexes.Add(index);
-                    }
+                    var index = BuildIndexSchema(indexName, desc, keys);
+                    res.Indexes.Add(index);
                 }
             }
             catch (Exception)
@@ -1255,27 +1234,25 @@ namespace DbAccess
         /// <param name="ts">The table schema to whom foreign key schema should be added to</param>
         private static void CreateForeignKeySchema(SqlConnection conn, TableSchema ts)
         {
-            ts.ForeignKeys = new List<ForeignKeySchema>();
+            ts.ForeignKeys = [];
 
             var cmd = new SqlCommand(
                 $@"SELECT   ColumnName = CU.COLUMN_NAME,   ForeignTableName  = PK.TABLE_NAME,   ForeignColumnName = PT.COLUMN_NAME,   DeleteRule = C.DELETE_RULE,   IsNullable = COL.IS_NULLABLE FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS C INNER JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS FK ON C.CONSTRAINT_NAME = FK.CONSTRAINT_NAME INNER JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS PK ON C.UNIQUE_CONSTRAINT_NAME = PK.CONSTRAINT_NAME INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE CU ON C.CONSTRAINT_NAME = CU.CONSTRAINT_NAME INNER JOIN   (     SELECT i1.TABLE_NAME, i2.COLUMN_NAME     FROM  INFORMATION_SCHEMA.TABLE_CONSTRAINTS i1     INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE i2 ON i1.CONSTRAINT_NAME = i2.CONSTRAINT_NAME     WHERE i1.CONSTRAINT_TYPE = 'PRIMARY KEY'   ) PT ON PT.TABLE_NAME = PK.TABLE_NAME INNER JOIN INFORMATION_SCHEMA.COLUMNS AS COL ON CU.COLUMN_NAME = COL.COLUMN_NAME AND FK.TABLE_NAME = COL.TABLE_NAME WHERE FK.Table_NAME='{ts.TableName}'",
                 conn);
 
-            using (var reader = cmd.ExecuteReader())
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
             {
-                while (reader.Read())
+                var fkc = new ForeignKeySchema
                 {
-                    var fkc = new ForeignKeySchema
-                                  {
-                                      ColumnName = (string) reader["ColumnName"],
-                                      ForeignTableName = (string) reader["ForeignTableName"],
-                                      ForeignColumnName = (string) reader["ForeignColumnName"],
-                                      CascadeOnDelete = (string) reader["DeleteRule"] == "CASCADE",
-                                      IsNullable = (string) reader["IsNullable"] == "YES",
-                                      TableName = ts.TableName
-                                  };
-                    ts.ForeignKeys.Add(fkc);
-                }
+                    ColumnName = (string) reader["ColumnName"],
+                    ForeignTableName = (string) reader["ForeignTableName"],
+                    ForeignColumnName = (string) reader["ForeignColumnName"],
+                    CascadeOnDelete = (string) reader["DeleteRule"] == "CASCADE",
+                    IsNullable = (string) reader["IsNullable"] == "YES",
+                    TableName = ts.TableName
+                };
+                ts.ForeignKeys.Add(fkc);
             }
         }
 
@@ -1299,7 +1276,7 @@ namespace DbAccess
             }
 
             // Get all key names and check if they are ASCENDING or DESCENDING
-            res.Columns = new List<IndexColumn>();
+            res.Columns = [];
             var keysParts = keys.Split(',');
             foreach (var p in keysParts)
             {
@@ -1360,10 +1337,6 @@ namespace DbAccess
             return connstring;
         }
 
-        #endregion
-
-        #region Trigger related
-
         private static void AddTriggersForForeignKeys(
             string sqlitePath,
             IEnumerable<TableSchema> schema,
@@ -1402,8 +1375,6 @@ namespace DbAccess
             }
         }
 
-        #endregion
-
         /// <summary>
         /// Gets a create script for the triggerSchema in sqlite syntax
         /// </summary>
@@ -1414,17 +1385,13 @@ namespace DbAccess
             return $@"CREATE TRIGGER [{ts.Name}] {ts.Type} {ts.Event} ON [{ts.Table}] BEGIN {ts.Body} END;";
         }
 
-        #region Private Variables
-
         private static bool _cancelled;
 
-        private static readonly Regex _keyRx = new Regex(@"(([a-zA-Z_‰ˆ¸ƒ÷‹ﬂ0-9\.]|(\s+))+)(\(\-\))?");
+        private static readonly Regex _keyRx = new(@"(([a-zA-Z_‰ˆ¸ƒ÷‹ﬂ0-9\.]|(\s+))+)(\(\-\))?");
 
-        private static readonly Regex _defaultValueRx = new Regex(@"\(N(\'.*\')\)");
+        private static readonly Regex _defaultValueRx = new(@"\(N(\'.*\')\)");
 
         private static readonly ILog _log = LogManager.GetLogger(typeof(SqlServerToSQLite));
-
-        #endregion
     }
 
     /// <summary>

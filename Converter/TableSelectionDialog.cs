@@ -13,16 +13,10 @@ namespace Converter
     /// </summary>
     public partial class TableSelectionDialog : Form
     {
-        #region Constructors
-
         public TableSelectionDialog()
         {
             this.InitializeComponent();
         }
-
-        #endregion
-
-        #region Public Properties
 
         /// <summary>
         /// Returns the list of included table schema objects.
@@ -32,10 +26,6 @@ namespace Converter
              let include = (bool)row.Cells[0].Value
              where include
              select (TableSchema)row.Tag).ToList();
-
-        #endregion
-
-        #region Public Methods
 
         /// <summary>
         /// Opens the table selection dialog and uses the specified schema list in order
@@ -49,10 +39,6 @@ namespace Converter
             this.UpdateGuiFromSchema(schema);
             return this.ShowDialog(owner);
         }
-
-        #endregion
-
-        #region Event Handlers
 
         private void OK_Click(object sender, EventArgs e)
         {
@@ -82,10 +68,6 @@ namespace Converter
             }
         }
 
-        #endregion
-
-        #region Private Methods
-
         private void UpdateGuiFromSchema(List<TableSchema> schema)
         {
             this.grdTables.Rows.Clear();
@@ -95,7 +77,5 @@ namespace Converter
                 this.grdTables.Rows[this.grdTables.Rows.Count - 1].Tag = table;
             }
         }
-
-        #endregion
     }
 }
