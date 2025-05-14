@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/SolutionItems/">
+    <File Path="SolutionInfo.cs" />
+  </Folder>
+  <Project Path="Converter/Converter.csproj" />
+  <Project Path="DbAccess/DbAccess.csproj" />
+</Solution>
