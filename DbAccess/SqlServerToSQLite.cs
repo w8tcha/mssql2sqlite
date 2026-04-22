@@ -1,11 +1,12 @@
 using System.Linq;
 
+using Microsoft.Data.SqlClient;
+
 namespace DbAccess
 {
     using System;
     using System.Collections.Generic;
     using System.Data;
-    using System.Data.SqlClient;
     using System.Data.SQLite;
     using System.IO;
     using System.Text;
@@ -19,7 +20,7 @@ namespace DbAccess
     /// and convert it to an SQLite database file.
     /// </summary>
     /// <remarks>The class knows how to convert table and index structures only.</remarks>
-    public class SqlServerToSQLite
+    public partial class SqlServerToSQLite
     {
         /// <summary>
         /// Gets a value indicating whether this instance is active.
@@ -132,7 +133,7 @@ namespace DbAccess
         private static void CopySqlServerRowsToSQLiteDB(
             string sqlConnString,
             string sqlitePath,
-            IReadOnlyList<TableSchema> schema,
+            List<TableSchema> schema,
             string password,
             SqlConversionHandler handler)
         {
@@ -318,7 +319,7 @@ namespace DbAccess
 
                 default:
                     _log.Error("argument exception - illegal database type");
-                    throw new ArgumentException($"Illegal database type [{Enum.GetName(typeof(DbType), dt)}]");
+                    throw new ArgumentException($"Illegal database type [{Enum.GetName(dt)}]");
             } // switch
 
             return val;
@@ -800,7 +801,7 @@ namespace DbAccess
             var defval = StripParens(col.DefaultValue);
             defval = DiscardNational(defval);
             _log.Debug($"DEFAULT VALUE BEFORE [{col.DefaultValue}] AFTER [{defval}]");
-            if (defval != string.Empty && defval.ToUpper().Contains("GETDATE"))
+            if (defval != string.Empty && defval.Contains("GETDATE", StringComparison.CurrentCultureIgnoreCase))
             {
                 _log.Debug($"converted SQL Server GETDATE() to CURRENT_TIMESTAMP for column [{col.ColumnName}]");
                 sb.Append(" DEFAULT (CURRENT_TIMESTAMP)");
@@ -819,7 +820,7 @@ namespace DbAccess
         /// <returns></returns>
         private static string DiscardNational(string value)
         {
-            var rx = new Regex(@"N\'([^\']*)\'");
+            var rx = DiscardRx();
             var m = rx.Match(value);
             return m.Success ? m.Groups[1].Value : value;
         }
@@ -847,7 +848,7 @@ namespace DbAccess
         /// <returns>The stripped string</returns>
         private static string StripParens(string value)
         {
-            var rx = new Regex(@"\(([^\)]*)\)");
+            var rx = StripParensRx();
             var m = rx.Match(value);
             return !m.Success ? value : StripParens(m.Groups[1].Value);
         }
@@ -919,7 +920,7 @@ namespace DbAccess
                 tables = updated;
             // if
 
-            var removedbo = new Regex(@"dbo\.", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            var removedbo = RemoveDboRx();
 
             // Continue and read all of the views in the database
             var views = new List<ViewSchema>();
@@ -1387,11 +1388,26 @@ namespace DbAccess
 
         private static bool _cancelled;
 
-        private static readonly Regex _keyRx = new(@"(([a-zA-Z_‰ˆ¸ƒ÷‹ﬂ0-9\.]|(\s+))+)(\(\-\))?");
+        private static readonly Regex _keyRx = KeyRx();
 
-        private static readonly Regex _defaultValueRx = new(@"\(N(\'.*\')\)");
+        private static readonly Regex _defaultValueRx = DefaultValueRx();
 
         private static readonly ILog _log = LogManager.GetLogger(typeof(SqlServerToSQLite));
+
+        [GeneratedRegex(@"(([a-zA-Z_‰ˆ¸ƒ÷‹ﬂ0-9\.]|(\s+))+)(\(\-\))?")]
+        private static partial Regex KeyRx();
+
+        [GeneratedRegex(@"N\'([^\']*)\'")]
+        private static partial Regex DiscardRx();
+
+        [GeneratedRegex(@"\(([^\)]*)\)")]
+        private static partial Regex StripParensRx();
+
+        [GeneratedRegex(@"dbo\.", RegexOptions.IgnoreCase | RegexOptions.Compiled, "de-DE")]
+        private static partial Regex RemoveDboRx();
+
+        [GeneratedRegex(@"\(N(\'.*\')\)")]
+        private static partial Regex DefaultValueRx();
     }
 
     /// <summary>
