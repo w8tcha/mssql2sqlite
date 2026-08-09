@@ -70,4 +70,4 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "${{ steps.version.outputs.tag }}" "SqlConverter-${{ steps.version.outputs.version }}-win-x64.zip" --repo $env:GITHUB_REPOSITORY --title "${{ steps.version.outputs.tag }}" --generate-notes
+        run: gh release create "${{ steps.version.outputs.tag }}" "SqlConverter-${{ steps.version.outputs.version }}-win-x64.zip" --repo $env:GITHUB_REPOSITORY --title "SqlConverter ${{ steps.version.outputs.tag }}" --generate-notes
