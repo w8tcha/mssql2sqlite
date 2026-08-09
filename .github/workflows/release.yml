@@ -1,0 +1,68 @@
+name: release
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'SolutionInfo.cs'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Extract version from SolutionInfo.cs
+        id: version
+        shell: pwsh
+        run: |
+          $content = Get-Content SolutionInfo.cs -Raw
+          $match = [regex]::Match($content, 'AssemblyVersion\("([^"]+)"\)')
+          if (-not $match.Success) {
+            Write-Error "Could not find AssemblyVersion in SolutionInfo.cs"
+            exit 1
+          }
+          $version = $match.Groups[1].Value
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+
+      - name: Check if release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          gh release view "${{ steps.version.outputs.tag }}" --repo $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            "exists=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "exists=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Setup .NET SDK
+        if: steps.check.outputs.exists == 'false'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish
+        if: steps.check.outputs.exists == 'false'
+        run: dotnet publish Converter/Converter.csproj -c Release -r win-x64 --self-contained true -o publish
+
+      - name: Create zip archive
+        if: steps.check.outputs.exists == 'false'
+        shell: pwsh
+        run: Compress-Archive -Path publish\* -DestinationPath "SqlConverter-${{ steps.version.outputs.version }}-win-x64.zip"
+
+      - name: Create GitHub release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${{ steps.version.outputs.tag }}" "SqlConverter-${{ steps.version.outputs.version }}-win-x64.zip" --repo $env:GITHUB_REPOSITORY --title "${{ steps.version.outputs.tag }}" --generate-notes
