@@ -221,7 +221,7 @@ namespace Converter
                                         var res = dlg.ShowTables(schema, this);
                                         if (res == DialogResult.OK)
                                         {
-                                            updated = dlg.IncludedTables;
+                                            updated = dlg.GetIncludedTables();
                                         }
                                     }));
                         return updated;

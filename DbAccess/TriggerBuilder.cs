@@ -1,8 +1,6 @@
 ﻿namespace DbAccess
 {
     using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
 
     /// <summary>
     /// The trigger builder.
@@ -13,7 +11,7 @@
         {
             IList<TriggerSchema> result = new List<TriggerSchema>();
 
-            foreach (var fks in from fks in dt.ForeignKeys let sb = new StringBuilder() select fks)
+            foreach (var fks in dt.ForeignKeys)
             {
                 result.Add(GenerateInsertTrigger(fks));
                 result.Add(GenerateUpdateTrigger(fks));

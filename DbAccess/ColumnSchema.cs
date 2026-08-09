@@ -16,6 +16,6 @@ namespace DbAccess
 
         public bool IsIdentity { get; set; }
 
-        public bool? IsCaseSensitive = null;
+        public bool? IsCaseSensitive { get; set; } = null;
     }
 }

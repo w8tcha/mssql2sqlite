@@ -21,7 +21,7 @@ namespace Converter
         /// <summary>
         /// Returns the list of included table schema objects.
         /// </summary>
-        public List<TableSchema> IncludedTables =>
+        public List<TableSchema> GetIncludedTables() =>
             (from DataGridViewRow row in this.grdTables.Rows
              let include = (bool)row.Cells[0].Value
              where include

@@ -20,7 +20,7 @@ namespace DbAccess
     /// and convert it to an SQLite database file.
     /// </summary>
     /// <remarks>The class knows how to convert table and index structures only.</remarks>
-    public partial class SqlServerToSQLite
+    public static partial class SqlServerToSQLite
     {
         /// <summary>
         /// Gets a value indicating whether this instance is active.
@@ -201,11 +201,10 @@ namespace DbAccess
                         true,
                         (int)(100.0 * i / schema.Count),
                         $"Finished inserting rows for table {schema[i].TableName}");
-                    _log.Debug($"finished inserting all rows for table [{schema[i].TableName}]");
+                    _log.DebugFormat("finished inserting all rows for table [{0}]", schema[i].TableName);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    _log.Error("unexpected exception", ex);
                     tx.Rollback();
                     throw;
                 }
@@ -483,7 +482,7 @@ namespace DbAccess
                     return DbType.Int64;
                 default:
                     _log.Error("illegal db type found");
-                    throw new ApplicationException($"Illegal DB type found ({cs.ColumnType})");
+                    throw new NotSupportedException($"Illegal DB type found ({cs.ColumnType})");
             }
         }
 
@@ -529,7 +528,7 @@ namespace DbAccess
             // Create the SQLite database file
             SQLiteConnection.CreateFile(sqlitePath);
 
-            _log.Debug($"SQLite file was created successfully at [{sqlitePath}]");
+            _log.DebugFormat("SQLite file was created successfully at [{0}]", sqlitePath);
 
             // Connect to the newly created database
             var sqliteConnString = CreateSQLiteConnectionString(sqlitePath, password);
@@ -541,15 +540,7 @@ namespace DbAccess
                 var count = 0;
                 foreach (var dt in schema.Tables)
                 {
-                    try
-                    {
-                        AddSQLiteTable(conn, dt);
-                    }
-                    catch (Exception ex)
-                    {
-                        _log.Error("AddSQLiteTable failed", ex);
-                        throw;
-                    }
+                    AddSQLiteTable(conn, dt);
 
                     count++;
                     CheckCancelled();
@@ -559,7 +550,7 @@ namespace DbAccess
                         (int) (count * 50.0 / schema.Tables.Count),
                         $"Added table {dt.TableName} to the SQLite database");
 
-                    _log.Debug($"added schema for SQLite table [{dt.TableName}]");
+                    _log.DebugFormat("added schema for SQLite table [{0}]", dt.TableName);
                 }
 
                 // Create all views in the new database
@@ -568,15 +559,7 @@ namespace DbAccess
                 {
                     foreach (var vs in schema.Views)
                     {
-                        try
-                        {
-                            AddSQLiteView(conn, vs, viewFailureHandler);
-                        }
-                        catch (Exception ex)
-                        {
-                            _log.Error("AddSQLiteView failed", ex);
-                            throw;
-                        } // catch
+                        AddSQLiteView(conn, vs, viewFailureHandler);
 
                         count++;
                         CheckCancelled();
@@ -586,7 +569,7 @@ namespace DbAccess
                             50 + (int)(count * 50.0 / schema.Views.Count),
                             $"Added view {vs.ViewName} to the SQLite database");
 
-                        _log.Debug("added schema for SQLite view [" + vs.ViewName + "]");
+                        _log.DebugFormat("added schema for SQLite view [{0}]", vs.ViewName);
                     }
                 }
             }
@@ -598,7 +581,7 @@ namespace DbAccess
         {
             // Prepare a CREATE VIEW DDL statement
             var stmt = vs.ViewSQL;
-            _log.Info($"\n\n{stmt}\n\n");
+            _log.InfoFormat("\n\n{0}\n\n", stmt);
 
             // Execute the query in order to actually create the view.
             var tx = conn.BeginTransaction();
@@ -644,7 +627,7 @@ namespace DbAccess
             // Prepare a CREATE TABLE DDL statement
             var stmt = BuildCreateTableQuery(dt);
 
-            _log.Info($"\n\n{stmt}\n\n");
+            _log.InfoFormat("\n\n{0}\n\n", stmt);
 
             // Execute the query in order to actually create the table.
             var cmd = new SQLiteCommand(stmt, conn);
@@ -800,10 +783,10 @@ namespace DbAccess
 
             var defval = StripParens(col.DefaultValue);
             defval = DiscardNational(defval);
-            _log.Debug($"DEFAULT VALUE BEFORE [{col.DefaultValue}] AFTER [{defval}]");
+            _log.DebugFormat("DEFAULT VALUE BEFORE [{0}] AFTER [{1}]", col.DefaultValue, defval);
             if (defval != string.Empty && defval.Contains("GETDATE", StringComparison.CurrentCultureIgnoreCase))
             {
-                _log.Debug($"converted SQL Server GETDATE() to CURRENT_TIMESTAMP for column [{col.ColumnName}]");
+                _log.DebugFormat("converted SQL Server GETDATE() to CURRENT_TIMESTAMP for column [{0}]", col.ColumnName);
                 sb.Append(" DEFAULT (CURRENT_TIMESTAMP)");
             }
             else if (defval != string.Empty && IsValidDefaultValue(defval))
@@ -907,7 +890,7 @@ namespace DbAccess
                     CheckCancelled();
                     handler(false, true, (int) (count * 50.0 / tableNames.Count), $"Parsed table {tname}");
 
-                    _log.Debug($"parsed table schema for [{tname}]");
+                    _log.DebugFormat("parsed table schema for [{0}]", tname);
                 }
             }
  // using
@@ -951,7 +934,7 @@ namespace DbAccess
                     CheckCancelled();
                     handler(false, true, 50 + (int)(count * 50.0 / views.Count), $"Parsed view {vs.ViewName}");
 
-                    _log.Debug($"parsed view schema for [{vs.ViewName}]");
+                    _log.DebugFormat("parsed view schema for [{0}]", vs.ViewName);
                 }
                 // while
                 // using
@@ -969,7 +952,7 @@ namespace DbAccess
         private static void CheckCancelled()
         {
             if (_cancelled)
-                throw new ApplicationException("User cancelled the conversion");
+                throw new OperationCanceledException("User cancelled the conversion");
         }
 
         /// <summary>
@@ -986,8 +969,9 @@ namespace DbAccess
                               TableName = tableName, TableSchemaName = tschma, Columns = []
                           };
             var cmd = new SqlCommand(
-                $@"SELECT COLUMN_NAME,COLUMN_DEFAULT,IS_NULLABLE,DATA_TYPE,  (columnproperty(object_id(TABLE_NAME), COLUMN_NAME, 'IsIdentity')) AS [IDENT], CHARACTER_MAXIMUM_LENGTH AS CSIZE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{tableName}' ORDER BY ORDINAL_POSITION ASC",
+                "SELECT COLUMN_NAME,COLUMN_DEFAULT,IS_NULLABLE,DATA_TYPE,  (columnproperty(object_id(TABLE_NAME), COLUMN_NAME, 'IsIdentity')) AS [IDENT], CHARACTER_MAXIMUM_LENGTH AS CSIZE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @tableName ORDER BY ORDINAL_POSITION ASC",
                 conn);
+            cmd.Parameters.AddWithValue("@tableName", tableName);
             using (var reader = cmd.ExecuteReader())
             {
                 while (reader.Read())
@@ -1094,7 +1078,8 @@ namespace DbAccess
  // using
 
             // Find PRIMARY KEY information
-            var cmd2 = new SqlCommand($@"EXEC sp_pkeys '{tableName}'", conn);
+            var cmd2 = new SqlCommand("EXEC sp_pkeys @table_name", conn);
+            cmd2.Parameters.AddWithValue("@table_name", tableName);
             using (var reader = cmd2.ExecuteReader())
             {
                 res.PrimaryKey = [];
@@ -1108,7 +1093,8 @@ namespace DbAccess
  // using
 
             // Find COLLATE information for all columns in the table
-            var cmd4 = new SqlCommand($@"EXEC sp_tablecollations '{tschma}.{tableName}'", conn);
+            var cmd4 = new SqlCommand("EXEC sp_tablecollations @tablename", conn);
+            cmd4.Parameters.AddWithValue("@tablename", $"{tschma}.{tableName}");
             using (var reader = cmd4.ExecuteReader())
             {
                 while (reader.Read())
@@ -1140,7 +1126,8 @@ namespace DbAccess
             try
             {
                 // Find index information
-                var cmd3 = new SqlCommand($@"exec sp_helpindex '{tschma}.{tableName}'", conn);
+                var cmd3 = new SqlCommand("exec sp_helpindex @objname", conn);
+                cmd3.Parameters.AddWithValue("@objname", $"{tschma}.{tableName}");
                 using var reader = cmd3.ExecuteReader();
                 res.Indexes = [];
                 while (reader.Read())
@@ -1157,9 +1144,9 @@ namespace DbAccess
                     res.Indexes.Add(index);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                _log.Warn($"failed to read index information for table [{tableName}]");
+                _log.Warn(string.Format("failed to read index information for table [{0}]", tableName), ex);
             }
 
             return res;
@@ -1184,7 +1171,7 @@ namespace DbAccess
                 return;
             }
 
-            throw new ApplicationException($"Validation failed for data type [{dataType}]");
+            throw new NotSupportedException($"Validation failed for data type [{dataType}]");
         }
 
         /// <summary>
@@ -1214,13 +1201,10 @@ namespace DbAccess
                 return res.Substring(first, last - first + 1);
 
             var sb = new StringBuilder();
-            foreach (var t in res)
+            foreach (var t in res.Where(t => t != '(' && t != ')'))
             {
-                if (t != '(' && t != ')')
-                {
-                    sb.Append(t);
-                    replaced = true;
-                }
+                sb.Append(t);
+                replaced = true;
             }
 
             return replaced ? $"({sb})" : sb.ToString();
@@ -1238,8 +1222,9 @@ namespace DbAccess
             ts.ForeignKeys = [];
 
             var cmd = new SqlCommand(
-                $@"SELECT   ColumnName = CU.COLUMN_NAME,   ForeignTableName  = PK.TABLE_NAME,   ForeignColumnName = PT.COLUMN_NAME,   DeleteRule = C.DELETE_RULE,   IsNullable = COL.IS_NULLABLE FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS C INNER JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS FK ON C.CONSTRAINT_NAME = FK.CONSTRAINT_NAME INNER JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS PK ON C.UNIQUE_CONSTRAINT_NAME = PK.CONSTRAINT_NAME INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE CU ON C.CONSTRAINT_NAME = CU.CONSTRAINT_NAME INNER JOIN   (     SELECT i1.TABLE_NAME, i2.COLUMN_NAME     FROM  INFORMATION_SCHEMA.TABLE_CONSTRAINTS i1     INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE i2 ON i1.CONSTRAINT_NAME = i2.CONSTRAINT_NAME     WHERE i1.CONSTRAINT_TYPE = 'PRIMARY KEY'   ) PT ON PT.TABLE_NAME = PK.TABLE_NAME INNER JOIN INFORMATION_SCHEMA.COLUMNS AS COL ON CU.COLUMN_NAME = COL.COLUMN_NAME AND FK.TABLE_NAME = COL.TABLE_NAME WHERE FK.Table_NAME='{ts.TableName}'",
+                @"SELECT   ColumnName = CU.COLUMN_NAME,   ForeignTableName  = PK.TABLE_NAME,   ForeignColumnName = PT.COLUMN_NAME,   DeleteRule = C.DELETE_RULE,   IsNullable = COL.IS_NULLABLE FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS C INNER JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS FK ON C.CONSTRAINT_NAME = FK.CONSTRAINT_NAME INNER JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS PK ON C.UNIQUE_CONSTRAINT_NAME = PK.CONSTRAINT_NAME INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE CU ON C.CONSTRAINT_NAME = CU.CONSTRAINT_NAME INNER JOIN   (     SELECT i1.TABLE_NAME, i2.COLUMN_NAME     FROM  INFORMATION_SCHEMA.TABLE_CONSTRAINTS i1     INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE i2 ON i1.CONSTRAINT_NAME = i2.CONSTRAINT_NAME     WHERE i1.CONSTRAINT_TYPE = 'PRIMARY KEY'   ) PT ON PT.TABLE_NAME = PK.TABLE_NAME INNER JOIN INFORMATION_SCHEMA.COLUMNS AS COL ON CU.COLUMN_NAME = COL.COLUMN_NAME AND FK.TABLE_NAME = COL.TABLE_NAME WHERE FK.Table_NAME=@tableName",
                 conn);
+            cmd.Parameters.AddWithValue("@tableName", ts.TableName);
 
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -1270,10 +1255,9 @@ namespace DbAccess
 
             // Determine if this is a unique index or not.
             var descParts = desc.Split(',');
-            foreach (var p in descParts.Where(p => p.Trim().Contains("unique")))
+            if (descParts.Any(p => p.Trim().Contains("unique")))
             {
                 res.IsUnique = true;
-                break;
             }
 
             // Get all key names and check if they are ASCENDING or DESCENDING
@@ -1284,7 +1268,7 @@ namespace DbAccess
                 var m = _keyRx.Match(p.Trim());
                 if (!m.Success)
                 {
-                    throw new ApplicationException($"Illegal key name [{p}] in index [{indexName}]");
+                    throw new FormatException($"Illegal key name [{p}] in index [{indexName}]");
                 }
 
                 var key = m.Groups[1].Value;
@@ -1352,15 +1336,7 @@ namespace DbAccess
                 // foreach
                 foreach (var dt in schema)
                 {
-                    try
-                    {
-                        AddTableTriggers(conn, dt);
-                    }
-                    catch (Exception ex)
-                    {
-                        _log.Error("AddTableTriggers failed", ex);
-                        throw;
-                    }
+                    AddTableTriggers(conn, dt);
                 }
             }
 
@@ -1394,7 +1370,7 @@ namespace DbAccess
 
         private static readonly ILog _log = LogManager.GetLogger(typeof(SqlServerToSQLite));
 
-        [GeneratedRegex(@"(([a-zA-Z_äöüÄÖÜß0-9\.]|(\s+))+)(\(\-\))?")]
+        [GeneratedRegex(@"(([a-zA-Z_ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½0-9\.]|(\s+))+)(\(\-\))?")]
         private static partial Regex KeyRx();
 
         [GeneratedRegex(@"N\'([^\']*)\'")]

@@ -12,6 +12,7 @@ namespace Converter
             this.InitializeComponent();
         }
 
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         public ViewSchema View
         {
             get => this._view;
